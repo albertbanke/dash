@@ -21,6 +21,8 @@ export interface LinkedItem {
   state?: string;
   tags?: string[];
   description?: string;
+  acceptanceCriteria?: string;
+  parents?: AzureDevOpsWorkItemRef[];
 }
 
 export interface Task {
@@ -81,6 +83,12 @@ export interface RemoveWorktreeOptions {
   deleteWorktreeDir?: boolean;
   deleteLocalBranch?: boolean;
   deleteRemoteBranch?: boolean;
+}
+
+export interface TaskContextMeta {
+  issueNumbers: number[];
+  gitRemote?: string;
+  adoWorkItems?: Array<{ id: number; url: string }>;
 }
 
 export interface PtyOptions {
@@ -214,6 +222,14 @@ export interface GithubIssue {
 
 // ── Azure DevOps Types ─────────────────────────────────────
 
+export interface AzureDevOpsWorkItemRef {
+  id: number;
+  title: string;
+  type: string;
+  state: string;
+  url: string;
+}
+
 export interface AzureDevOpsWorkItem {
   id: number;
   title: string;
@@ -223,6 +239,8 @@ export interface AzureDevOpsWorkItem {
   assignedTo?: string;
   tags?: string[];
   description?: string;
+  acceptanceCriteria?: string;
+  parents?: AzureDevOpsWorkItemRef[];
 }
 
 export interface AzureDevOpsConfig {

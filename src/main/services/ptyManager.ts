@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { type WebContents, app } from 'electron';
 import { activityMonitor } from './ActivityMonitor';
 import { hookServer } from './HookServer';
+import type { TaskContextMeta } from '@shared/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -305,7 +306,7 @@ export async function startDirectPty(options: {
   reattached: boolean;
   isDirectSpawn: boolean;
   hasTaskContext: boolean;
-  taskContextMeta: { issueNumbers: number[]; gitRemote?: string } | null;
+  taskContextMeta: TaskContextMeta | null;
 }> {
   // Re-attach to existing PTY (e.g., after renderer reload)
   const existing = ptys.get(options.id);
@@ -382,7 +383,7 @@ export async function startDirectPty(options: {
   });
 
   const contextPath = path.join(options.cwd, '.claude', 'task-context.json');
-  let taskContextMeta: { issueNumbers: number[]; gitRemote?: string } | null = null;
+  let taskContextMeta: TaskContextMeta | null = null;
   try {
     if (fs.existsSync(contextPath)) {
       const parsed = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));

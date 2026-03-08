@@ -334,17 +334,31 @@ export class TerminalSessionManager {
           }
         }
 
-        // Show info line when issue context was injected via SessionStart hook
+        // Show info line when context was injected via SessionStart hook
         if (result.taskContextMeta && !result.reattached && !resume) {
-          const { issueNumbers, gitRemote } = result.taskContextMeta;
-          const issueLabels = issueNumbers.map((num) => {
-            const url = gitRemote ? this.issueUrl(gitRemote, num) : null;
-            // OSC 8 hyperlink: \x1b]8;;URL\x07TEXT\x1b]8;;\x07
-            return url ? `\x1b]8;;${url}\x07#${num}\x1b]8;;\x07` : `#${num}`;
-          });
-          this.terminal.write(
-            `\x1b[2m\x1b[36m● Issue context injected: ${issueLabels.join(', ')}\x1b[0m\r\n`,
-          );
+          const { issueNumbers, gitRemote, adoWorkItems } = result.taskContextMeta;
+          const hasGitHub = issueNumbers.length > 0;
+          const hasAdo = adoWorkItems && adoWorkItems.length > 0;
+
+          if (hasGitHub) {
+            const issueLabels = issueNumbers.map((num) => {
+              const url = gitRemote ? this.issueUrl(gitRemote, num) : null;
+              // OSC 8 hyperlink: \x1b]8;;URL\x07TEXT\x1b]8;;\x07
+              return url ? `\x1b]8;;${url}\x07#${num}\x1b]8;;\x07` : `#${num}`;
+            });
+            this.terminal.write(
+              `\x1b[2m\x1b[36m● Issue context injected: ${issueLabels.join(', ')}\x1b[0m\r\n`,
+            );
+          }
+
+          if (hasAdo) {
+            const wiLabels = adoWorkItems.map((wi) => {
+              return wi.url ? `\x1b]8;;${wi.url}\x07#${wi.id}\x1b]8;;\x07` : `#${wi.id}`;
+            });
+            this.terminal.write(
+              `\x1b[2m\x1b[36m● Work item context injected: ${wiLabels.join(', ')}\x1b[0m\r\n`,
+            );
+          }
         }
       }
     }
@@ -547,7 +561,7 @@ export class TerminalSessionManager {
   private async startPty(resume: boolean = false): Promise<{
     reattached: boolean;
     isDirectSpawn: boolean;
-    taskContextMeta: { issueNumbers: number[]; gitRemote?: string } | null;
+    taskContextMeta: import('../../shared/types').TaskContextMeta | null;
   }> {
     const dims = this.fitAddon.proposeDimensions();
     const cols = dims?.cols ?? 120;
@@ -555,7 +569,7 @@ export class TerminalSessionManager {
 
     let reattached = false;
     let isDirectSpawn = false;
-    let taskContextMeta: { issueNumbers: number[]; gitRemote?: string } | null = null;
+    let taskContextMeta: import('../../shared/types').TaskContextMeta | null = null;
 
     const resp = await window.electronAPI.ptyStartDirect({
       id: this.id,

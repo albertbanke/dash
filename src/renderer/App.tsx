@@ -702,16 +702,29 @@ export function App() {
             wi.type ? `Type: ${wi.type}` : '',
             wi.state ? `State: ${wi.state}` : '',
             wi.tags?.length ? `Tags: ${wi.tags.join(', ')}` : '',
+            wi.parents?.length
+              ? `Hierarchy: ${wi.parents.map((p) => `${p.type} #${p.id} "${p.title}"`).join(' → ')}`
+              : '',
           ]
             .filter(Boolean)
             .join('\n');
-          const descExcerpt = wi.description
-            ? wi.description.slice(0, 2000) + (wi.description.length > 2000 ? '...' : '')
-            : '';
-          return `## Work Item #${wi.id}: ${wi.title}\n${meta ? meta + '\n' : ''}URL: ${wi.url}${descExcerpt ? '\n\n' + descExcerpt : ''}`;
+          const truncate = (s: string | undefined, max: number) =>
+            s ? s.slice(0, max) + (s.length > max ? '...' : '') : '';
+          const desc = truncate(wi.description, 2000);
+          const ac = truncate(wi.acceptanceCriteria, 1000);
+          const sections = [
+            `## Work Item #${wi.id}: ${wi.title}`,
+            meta,
+            `URL: ${wi.url}`,
+            desc ? `### Description\n${desc}` : '',
+            ac ? `### Acceptance Criteria\n${ac}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+          return sections;
         });
         contextBlocks.push(
-          `I'm working on the following Azure DevOps work item(s):\n\n${wiBlocks.join('\n\n')}`,
+          `I'm working on the following Azure DevOps work item(s):\n\n${wiBlocks.join('\n\n---\n\n')}`,
         );
       }
 
@@ -723,6 +736,8 @@ export function App() {
           meta: {
             issueNumbers: linkedIssues?.map((i) => i.number) ?? [],
             gitRemote: targetProject.gitRemote ?? undefined,
+            adoWorkItems:
+              adoItems.length > 0 ? adoItems.map((wi) => ({ id: wi.id, url: wi.url })) : undefined,
           },
         });
       }

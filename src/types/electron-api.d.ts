@@ -14,6 +14,7 @@ import type {
   CommitGraphData,
   CommitDetail,
   RemoteControlState,
+  TaskContextMeta,
 } from '../shared/types';
 
 export interface ElectronAPI {
@@ -97,7 +98,7 @@ export interface ElectronAPI {
       reattached: boolean;
       isDirectSpawn: boolean;
       hasTaskContext: boolean;
-      taskContextMeta: { issueNumbers: number[]; gitRemote?: string } | null;
+      taskContextMeta: TaskContextMeta | null;
     }>
   >;
   ptyStart: (args: {
@@ -140,7 +141,7 @@ export interface ElectronAPI {
   ptyWriteTaskContext: (args: {
     cwd: string;
     prompt: string;
-    meta?: { issueNumbers: number[]; gitRemote?: string };
+    meta?: TaskContextMeta;
   }) => Promise<IpcResponse<void>>;
 
   // App lifecycle
