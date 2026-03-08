@@ -248,6 +248,7 @@ export function TaskModal({ projectPath, gitRemote, onClose, onCreate }: TaskMod
           type: wi.type,
           state: wi.state,
           tags: wi.tags,
+          description: wi.description,
         })),
       ];
 

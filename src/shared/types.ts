@@ -20,6 +20,7 @@ export interface LinkedItem {
   type?: string;
   state?: string;
   tags?: string[];
+  description?: string;
 }
 
 export interface Task {

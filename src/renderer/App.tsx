@@ -705,7 +705,10 @@ export function App() {
           ]
             .filter(Boolean)
             .join('\n');
-          return `## Work Item #${wi.id}: ${wi.title}\n${meta ? meta + '\n' : ''}URL: ${wi.url}`;
+          const descExcerpt = wi.description
+            ? wi.description.slice(0, 2000) + (wi.description.length > 2000 ? '...' : '')
+            : '';
+          return `## Work Item #${wi.id}: ${wi.title}\n${meta ? meta + '\n' : ''}URL: ${wi.url}${descExcerpt ? '\n\n' + descExcerpt : ''}`;
         });
         contextBlocks.push(
           `I'm working on the following Azure DevOps work item(s):\n\n${wiBlocks.join('\n\n')}`,
