@@ -56,9 +56,10 @@ export class AzureDevOpsService {
     query: string,
   ): Promise<AzureDevOpsWorkItem[]> {
     const sanitized = query.trim().replace(/[^a-zA-Z0-9\s\-_]/g, '');
+    // Endpoint is project-scoped, so no need to filter by TeamProject
     const wiql = sanitized
-      ? `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${config.project}' AND [System.Title] CONTAINS '${sanitized}' ORDER BY [System.ChangedDate] DESC`
-      : `SELECT [System.Id] FROM WorkItems WHERE [System.TeamProject] = '${config.project}' AND [System.State] <> 'Closed' AND [System.State] <> 'Removed' ORDER BY [System.ChangedDate] DESC`;
+      ? `SELECT [System.Id] FROM WorkItems WHERE [System.Title] CONTAINS '${sanitized}' ORDER BY [System.ChangedDate] DESC`
+      : `SELECT [System.Id] FROM WorkItems WHERE [System.State] <> 'Closed' AND [System.State] <> 'Removed' ORDER BY [System.ChangedDate] DESC`;
 
     const wiqlResult = (await this.request(config, `${config.project}/_apis/wit/wiql`, {
       method: 'POST',

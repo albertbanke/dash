@@ -171,6 +171,7 @@ export function SettingsModal({
 
   // Azure DevOps state
   const [adoEnabled, setAdoEnabled] = useState(false);
+  const [adoExpanded, setAdoExpanded] = useState(false);
   const [adoOrgUrl, setAdoOrgUrl] = useState('');
   const [adoProject, setAdoProject] = useState('');
   const [adoPat, setAdoPat] = useState('');
@@ -746,55 +747,78 @@ export function SettingsModal({
                 className="rounded-xl border border-border/40"
                 style={{ background: 'hsl(var(--surface-2))' }}
               >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (adoEnabled) {
-                      // Turning off — remove config
-                      window.electronAPI.adoRemoveConfig();
-                      setAdoOrgUrl('');
-                      setAdoProject('');
-                      setAdoPat('');
-                      setAdoConfigured(false);
-                      setAdoTestResult(null);
-                    }
-                    setAdoEnabled(!adoEnabled);
-                  }}
-                  className="flex items-center gap-3.5 w-full p-4"
-                >
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      adoConfigured ? 'bg-[hsl(var(--git-added)/0.12)]' : 'bg-accent/60'
-                    }`}
-                  >
-                    {adoConfigured ? (
-                      <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={2.5} />
-                    ) : (
-                      <AlertCircle size={14} className="text-muted-foreground/40" strokeWidth={2} />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <p className="text-[13px] font-medium text-foreground/90">Azure DevOps</p>
-                    <p className="text-[11px] text-foreground/50">
-                      {adoConfigured ? 'Connected' : 'Not configured'}
-                    </p>
-                  </div>
-                  <div
-                    className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 flex-shrink-0 ${
-                      adoEnabled ? 'bg-primary' : 'bg-border'
-                    }`}
+                <div className="flex items-center gap-3.5 w-full p-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (adoEnabled) setAdoExpanded(!adoExpanded);
+                    }}
+                    className={`flex items-center gap-3.5 flex-1 min-w-0 text-left ${adoEnabled ? 'cursor-pointer' : 'cursor-default'}`}
                   >
                     <div
-                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
-                        adoEnabled ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                      className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        adoConfigured ? 'bg-[hsl(var(--git-added)/0.12)]' : 'bg-accent/60'
                       }`}
-                    />
-                  </div>
-                </button>
+                    >
+                      {adoConfigured ? (
+                        <Check
+                          size={14}
+                          className="text-[hsl(var(--git-added))]"
+                          strokeWidth={2.5}
+                        />
+                      ) : (
+                        <AlertCircle
+                          size={14}
+                          className="text-muted-foreground/40"
+                          strokeWidth={2}
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-foreground/90">Azure DevOps</p>
+                      <p className="text-[11px] text-foreground/50">
+                        {adoConfigured ? 'Connected' : 'Not configured'}
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (adoEnabled) {
+                        // Turning off — remove config and collapse
+                        window.electronAPI.adoRemoveConfig();
+                        setAdoOrgUrl('');
+                        setAdoProject('');
+                        setAdoPat('');
+                        setAdoConfigured(false);
+                        setAdoTestResult(null);
+                        setAdoExpanded(false);
+                        setAdoEnabled(false);
+                      } else {
+                        // Turning on — expand to configure
+                        setAdoEnabled(true);
+                        setAdoExpanded(true);
+                      }
+                    }}
+                    className="flex-shrink-0"
+                  >
+                    <div
+                      className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 ${
+                        adoEnabled ? 'bg-primary' : 'bg-border'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                          adoEnabled ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                        }`}
+                      />
+                    </div>
+                  </button>
+                </div>
 
                 <div
                   className="grid transition-[grid-template-rows] duration-200 ease-in-out"
-                  style={{ gridTemplateRows: adoEnabled ? '1fr' : '0fr' }}
+                  style={{ gridTemplateRows: adoExpanded ? '1fr' : '0fr' }}
                 >
                   <div className="overflow-hidden">
                     <div className="px-4 pb-4 space-y-2.5">
