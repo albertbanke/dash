@@ -153,11 +153,7 @@ function buildDirectEnv(isDark: boolean): Record<string, string> {
  * Write .claude/task-context.json with issue context for the SessionStart hook.
  * Called from IPC during task creation, before Claude spawns.
  */
-export function writeTaskContext(
-  cwd: string,
-  prompt: string,
-  meta?: { issueNumbers: number[]; gitRemote?: string },
-): void {
+export function writeTaskContext(cwd: string, prompt: string, meta?: TaskContextMeta): void {
   const claudeDir = path.join(cwd, '.claude');
   const contextPath = path.join(claudeDir, 'task-context.json');
 

@@ -16,7 +16,11 @@ import { AddProjectModal } from './components/AddProjectModal';
 import { DeleteTaskModal } from './components/DeleteTaskModal';
 import { RemoteControlModal } from './components/RemoteControlModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ProjectSettingsModal } from './components/ProjectSettingsModal';
+import { AdoSetupModal } from './components/AdoSetupModal';
+import { parseAdoRemote } from '../shared/urls';
 import { ToastContainer } from './components/Toast';
+import { toast } from 'sonner';
 import type {
   Project,
   Task,
@@ -53,6 +57,12 @@ export function App() {
     error: null,
   });
   const [deleteTaskTarget, setDeleteTaskTarget] = useState<Task | null>(null);
+  const [projectSettingsTarget, setProjectSettingsTarget] = useState<Project | null>(null);
+  const [adoSetup, setAdoSetup] = useState<{
+    projectId: string;
+    organizationUrl: string;
+    project: string;
+  } | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark') || 'dark';
@@ -539,6 +549,18 @@ export function App() {
 
   // ── Handlers ─────────────────────────────────────────────
 
+  function promptAdoSetupIfNeeded(projectId: string, remote: string | null) {
+    if (!remote) return;
+    const adoInfo = parseAdoRemote(remote);
+    if (adoInfo) {
+      setAdoSetup({
+        projectId,
+        organizationUrl: adoInfo.organizationUrl,
+        project: adoInfo.project,
+      });
+    }
+  }
+
   async function handleOpenFolder() {
     setShowAddProjectModal(false);
     const resp = await window.electronAPI.showOpenDialog();
@@ -559,6 +581,7 @@ export function App() {
       if (saveResp.success && saveResp.data) {
         await loadProjects();
         setActiveProjectId(saveResp.data.id);
+        promptAdoSetupIfNeeded(saveResp.data.id, gitInfo?.remote ?? null);
       }
     }
   }
@@ -587,6 +610,7 @@ export function App() {
       if (saveResp.success && saveResp.data) {
         await loadProjects();
         setActiveProjectId(saveResp.data.id);
+        promptAdoSetupIfNeeded(saveResp.data.id, gitInfo?.remote ?? null);
       }
 
       setCloneStatus({ loading: false, error: null });
@@ -686,8 +710,8 @@ export function App() {
             cwd: taskPath,
             prompt,
             meta: {
-              issueNumbers: ghIssueNumbers,
-              gitRemote: targetProject.gitRemote ?? undefined,
+              githubIssues:
+                ghItems.length > 0 ? ghItems.map((i) => ({ id: i.id, url: i.url })) : undefined,
               adoWorkItems:
                 adoItems.length > 0
                   ? adoItems.map((wi) => ({ id: wi.id, url: wi.url }))
@@ -713,12 +737,16 @@ export function App() {
 
       // Fire-and-forget: post branch comment on each linked GitHub issue
       for (const num of ghIssueNumbers) {
-        window.electronAPI.githubPostBranchComment(targetProject.path, num, branch).catch(() => {});
+        window.electronAPI
+          .githubPostBranchComment(targetProject.path, num, branch)
+          .catch(() => toast.error(`Failed to link branch to issue #${num}`));
       }
 
       // Fire-and-forget: post branch comment on each linked ADO work item
       for (const wi of adoItems) {
-        window.electronAPI.adoPostBranchComment(wi.id, branch).catch(() => {});
+        window.electronAPI
+          .adoPostBranchComment(wi.id, branch, targetProject.id)
+          .catch(() => toast.error(`Failed to link branch to work item #${wi.id}`));
       }
     }
   }
@@ -929,6 +957,10 @@ export function App() {
                 setShowAddProjectModal(true);
               }}
               onDeleteProject={handleDeleteProject}
+              onProjectSettings={(id) => {
+                const p = projects.find((proj) => proj.id === id);
+                if (p) setProjectSettingsTarget(p);
+              }}
               tasksByProject={tasksByProject}
               activeTaskId={activeTaskId}
               onSelectTask={handleSelectTask}
@@ -1066,8 +1098,34 @@ export function App() {
           projectPath={
             projects.find((p) => p.id === (taskModalProjectId || activeProjectId))?.path ?? ''
           }
+          projectId={taskModalProjectId || activeProjectId || undefined}
           onClose={() => setShowTaskModal(false)}
           onCreate={handleCreateTask}
+        />
+      )}
+
+      {adoSetup && (
+        <AdoSetupModal
+          projectId={adoSetup.projectId}
+          organizationUrl={adoSetup.organizationUrl}
+          project={adoSetup.project}
+          onClose={() => setAdoSetup(null)}
+        />
+      )}
+
+      {projectSettingsTarget && (
+        <ProjectSettingsModal
+          project={projectSettingsTarget}
+          onClose={() => setProjectSettingsTarget(null)}
+          onRename={async (id, newName) => {
+            const proj = projects.find((p) => p.id === id);
+            if (!proj) return;
+            await window.electronAPI.saveProject({ ...proj, name: newName });
+            await loadProjects();
+            setProjectSettingsTarget((prev) =>
+              prev?.id === id ? { ...prev, name: newName } : prev,
+            );
+          }}
         />
       )}
 

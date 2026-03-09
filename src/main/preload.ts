@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ptyHasClaudeSession: (cwd: string) => ipcRenderer.invoke('pty:hasClaudeSession', cwd),
 
   // Task context for SessionStart hook
-  ptyWriteTaskContext: (args: { cwd: string; prompt: string }) =>
+  ptyWriteTaskContext: (args: { cwd: string; prompt: string; meta?: unknown }) =>
     ipcRenderer.invoke('pty:writeTaskContext', args),
 
   // App lifecycle
@@ -141,15 +141,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:link-branch', { cwd, issueNumber, branch }),
 
   // Azure DevOps
-  adoCheckConfigured: () => ipcRenderer.invoke('ado:check-configured'),
+  adoCheckConfigured: (projectId?: string) =>
+    ipcRenderer.invoke('ado:check-configured', { projectId }),
   adoTestConnection: (config: unknown) => ipcRenderer.invoke('ado:test-connection', config),
-  adoSaveConfig: (config: unknown) => ipcRenderer.invoke('ado:save-config', config),
-  adoGetConfig: () => ipcRenderer.invoke('ado:get-config'),
-  adoRemoveConfig: () => ipcRenderer.invoke('ado:remove-config'),
-  adoSearchWorkItems: (query: string) => ipcRenderer.invoke('ado:search-work-items', { query }),
-  adoGetWorkItem: (id: number) => ipcRenderer.invoke('ado:get-work-item', { id }),
-  adoPostBranchComment: (workItemId: number, branch: string) =>
-    ipcRenderer.invoke('ado:post-branch-comment', { workItemId, branch }),
+  adoSaveConfig: (config: unknown, projectId?: string) =>
+    ipcRenderer.invoke('ado:save-config', { config, projectId }),
+  adoGetConfig: (projectId?: string) => ipcRenderer.invoke('ado:get-config', { projectId }),
+  adoRemoveConfig: (projectId?: string) => ipcRenderer.invoke('ado:remove-config', { projectId }),
+  adoSearchWorkItems: (query: string, projectId?: string) =>
+    ipcRenderer.invoke('ado:search-work-items', { query, projectId }),
+  adoGetWorkItem: (id: number, projectId?: string) =>
+    ipcRenderer.invoke('ado:get-work-item', { id, projectId }),
+  adoPostBranchComment: (workItemId: number, branch: string, projectId?: string) =>
+    ipcRenderer.invoke('ado:post-branch-comment', { workItemId, branch, projectId }),
 
   // Git detection
   detectGit: (folderPath: string) => ipcRenderer.invoke('app:detectGit', folderPath),

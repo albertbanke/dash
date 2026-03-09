@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, AlertCircle, Sun, Moon, Terminal, RotateCcw, Download } from 'lucide-react';
+import { X, Check, AlertCircle, Sun, Moon, RotateCcw, Download } from 'lucide-react';
 import type { KeyBindingMap, KeyBinding } from '../keybindings';
 import {
   getBindingKeys,
@@ -135,9 +135,7 @@ export function SettingsModal({
   onKeybindingsChange,
   onClose,
 }: SettingsModalProps) {
-  const [tab, setTab] = useState<'general' | 'appearance' | 'keybindings' | 'connections'>(
-    'general',
-  );
+  const [tab, setTab] = useState<'general' | 'appearance' | 'keybindings'>('general');
   const [claudeInfo, setClaudeInfo] = useState<{
     installed: boolean;
     version: string | null;
@@ -169,20 +167,6 @@ export function SettingsModal({
     return () => cleanups.forEach((fn) => fn());
   }, []);
 
-  // Azure DevOps state
-  const [adoEnabled, setAdoEnabled] = useState(false);
-  const [adoExpanded, setAdoExpanded] = useState(false);
-  const [adoOrgUrl, setAdoOrgUrl] = useState('');
-  const [adoProject, setAdoProject] = useState('');
-  const [adoPat, setAdoPat] = useState('');
-  const [adoConfigured, setAdoConfigured] = useState(false);
-  const [adoTesting, setAdoTesting] = useState(false);
-  const [adoTestResult, setAdoTestResult] = useState<'success' | 'error' | null>(null);
-  const [adoSaving, setAdoSaving] = useState(false);
-
-  const isAdoUrlValid = adoOrgUrl.startsWith('https://');
-  const normalizeAdoUrl = (url: string) => url.replace(/\/+$/, '');
-
   useEffect(() => {
     window.electronAPI.detectClaude().then((resp) => {
       if (resp.success) setClaudeInfo(resp.data ?? null);
@@ -191,16 +175,6 @@ export function SettingsModal({
     window.electronAPI.getClaudeAttribution(activeProjectPath).then((resp) => {
       if (resp.success && resp.data != null) {
         setClaudeDefaultAttribution(resp.data);
-      }
-    });
-    // Load ADO config
-    window.electronAPI.adoGetConfig().then((resp) => {
-      if (resp.success && resp.data) {
-        setAdoOrgUrl(resp.data.organizationUrl);
-        setAdoProject(resp.data.project);
-        setAdoPat(resp.data.pat);
-        setAdoConfigured(true);
-        setAdoEnabled(true);
       }
     });
   }, [activeProjectPath]);
@@ -257,7 +231,7 @@ export function SettingsModal({
 
         {/* Tabs */}
         <div className="flex gap-0 px-5 border-b border-border/40">
-          {(['general', 'appearance', 'keybindings', 'connections'] as const).map((t) => (
+          {(['general', 'appearance', 'keybindings'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -476,6 +450,54 @@ export function SettingsModal({
                 </p>
               </div>
 
+              {/* Claude CLI */}
+              <div>
+                <label className="block text-[12px] font-medium text-foreground mb-3">
+                  Claude Code CLI
+                </label>
+                <div
+                  className="flex items-start gap-3.5 p-4 rounded-xl border border-border/40"
+                  style={{ background: 'hsl(var(--surface-2))' }}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      claudeInfo?.installed
+                        ? 'bg-[hsl(var(--git-added)/0.12)]'
+                        : 'bg-[hsl(var(--git-modified)/0.12)]'
+                    }`}
+                  >
+                    {claudeInfo?.installed ? (
+                      <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={2.5} />
+                    ) : (
+                      <AlertCircle
+                        size={14}
+                        className="text-[hsl(var(--git-modified))]"
+                        strokeWidth={2}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    {claudeInfo?.installed ? (
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] text-foreground/60 font-mono">
+                          {claudeInfo.version}
+                        </p>
+                        <p className="text-[11px] text-foreground/40 font-mono truncate">
+                          {claudeInfo.path}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-foreground/60 leading-relaxed">
+                        Not found. Install with{' '}
+                        <code className="px-1.5 py-0.5 rounded bg-accent/80 text-[10px] font-mono text-foreground/70">
+                          npm install -g @anthropic-ai/claude-code
+                        </code>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Updates */}
               <div>
                 <label className="block text-[12px] font-medium text-foreground mb-3">
@@ -690,261 +712,6 @@ export function SettingsModal({
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-
-          {tab === 'connections' && (
-            <div className="space-y-3 animate-fade-in">
-              {/* Claude CLI */}
-              <div
-                className="flex items-start gap-3.5 p-4 rounded-xl border border-border/40"
-                style={{ background: 'hsl(var(--surface-2))' }}
-              >
-                <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    claudeInfo?.installed
-                      ? 'bg-[hsl(var(--git-added)/0.12)]'
-                      : 'bg-[hsl(var(--git-modified)/0.12)]'
-                  }`}
-                >
-                  {claudeInfo?.installed ? (
-                    <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={2.5} />
-                  ) : (
-                    <AlertCircle
-                      size={14}
-                      className="text-[hsl(var(--git-modified))]"
-                      strokeWidth={2}
-                    />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Terminal size={12} className="text-foreground/50" strokeWidth={2} />
-                    <p className="text-[13px] font-medium text-foreground/90">Claude Code CLI</p>
-                  </div>
-                  {claudeInfo?.installed ? (
-                    <div className="space-y-0.5">
-                      <p className="text-[11px] text-foreground/60 font-mono">
-                        {claudeInfo.version}
-                      </p>
-                      <p className="text-[11px] text-foreground/40 font-mono truncate">
-                        {claudeInfo.path}
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-foreground/60 leading-relaxed">
-                      Not found. Install with{' '}
-                      <code className="px-1.5 py-0.5 rounded bg-accent/80 text-[10px] font-mono text-foreground/70">
-                        npm install -g @anthropic-ai/claude-code
-                      </code>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Azure DevOps */}
-              <div
-                className="rounded-xl border border-border/40"
-                style={{ background: 'hsl(var(--surface-2))' }}
-              >
-                <div className="flex items-center gap-3.5 w-full p-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (adoEnabled) setAdoExpanded(!adoExpanded);
-                    }}
-                    className={`flex items-center gap-3.5 flex-1 min-w-0 text-left ${adoEnabled ? 'cursor-pointer' : 'cursor-default'}`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        adoConfigured ? 'bg-[hsl(var(--git-added)/0.12)]' : 'bg-accent/60'
-                      }`}
-                    >
-                      {adoConfigured ? (
-                        <Check
-                          size={14}
-                          className="text-[hsl(var(--git-added))]"
-                          strokeWidth={2.5}
-                        />
-                      ) : (
-                        <AlertCircle
-                          size={14}
-                          className="text-muted-foreground/40"
-                          strokeWidth={2}
-                        />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-foreground/90">Azure DevOps</p>
-                      <p className="text-[11px] text-foreground/50">
-                        {adoConfigured ? 'Connected' : 'Not configured'}
-                      </p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (adoEnabled) {
-                        // Turning off — remove config and collapse
-                        window.electronAPI.adoRemoveConfig();
-                        setAdoOrgUrl('');
-                        setAdoProject('');
-                        setAdoPat('');
-                        setAdoConfigured(false);
-                        setAdoTestResult(null);
-                        setAdoExpanded(false);
-                        setAdoEnabled(false);
-                      } else {
-                        // Turning on — expand to configure
-                        setAdoEnabled(true);
-                        setAdoExpanded(true);
-                      }
-                    }}
-                    className="flex-shrink-0"
-                  >
-                    <div
-                      className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 ${
-                        adoEnabled ? 'bg-primary' : 'bg-border'
-                      }`}
-                    >
-                      <div
-                        className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
-                          adoEnabled ? 'translate-x-[16px]' : 'translate-x-[2px]'
-                        }`}
-                      />
-                    </div>
-                  </button>
-                </div>
-
-                <div
-                  className="grid transition-[grid-template-rows] duration-200 ease-in-out"
-                  style={{ gridTemplateRows: adoExpanded ? '1fr' : '0fr' }}
-                >
-                  <div className="overflow-hidden">
-                    <div className="px-4 pb-4 space-y-2.5">
-                      <div>
-                        <label className="block text-[11px] text-foreground/50 mb-1">
-                          Organization URL
-                        </label>
-                        <input
-                          type="text"
-                          value={adoOrgUrl}
-                          onChange={(e) => {
-                            setAdoOrgUrl(e.target.value);
-                            setAdoTestResult(null);
-                          }}
-                          placeholder="https://dev.azure.com/myorg"
-                          className={`w-full px-3 py-2 rounded-lg bg-background border text-foreground text-[12px] font-mono placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 ${
-                            adoOrgUrl && !isAdoUrlValid
-                              ? 'border-destructive/60'
-                              : 'border-input/60'
-                          }`}
-                        />
-                        {adoOrgUrl && !isAdoUrlValid && (
-                          <p className="text-[10px] text-destructive/70 mt-0.5">
-                            Must start with https://
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-foreground/50 mb-1">Project</label>
-                        <input
-                          type="text"
-                          value={adoProject}
-                          onChange={(e) => {
-                            setAdoProject(e.target.value);
-                            setAdoTestResult(null);
-                          }}
-                          placeholder="MyProject"
-                          className="w-full px-3 py-2 rounded-lg bg-background border border-input/60 text-foreground text-[12px] placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] text-foreground/50 mb-1">
-                          Personal Access Token
-                        </label>
-                        <input
-                          type="password"
-                          value={adoPat}
-                          onChange={(e) => {
-                            setAdoPat(e.target.value);
-                            setAdoTestResult(null);
-                          }}
-                          placeholder="Enter PAT..."
-                          className="w-full px-3 py-2 rounded-lg bg-background border border-input/60 text-foreground text-[12px] font-mono placeholder:text-muted-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
-                        />
-                      </div>
-
-                      {adoTestResult && (
-                        <div
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] ${
-                            adoTestResult === 'success'
-                              ? 'bg-[hsl(var(--git-added)/0.1)] text-[hsl(var(--git-added))]'
-                              : 'bg-destructive/10 text-destructive'
-                          }`}
-                        >
-                          {adoTestResult === 'success' ? (
-                            <Check size={12} strokeWidth={2.5} />
-                          ) : (
-                            <AlertCircle size={12} strokeWidth={2} />
-                          )}
-                          {adoTestResult === 'success'
-                            ? 'Connection successful'
-                            : 'Connection failed — check credentials'}
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="button"
-                          disabled={!isAdoUrlValid || !adoProject || !adoPat || adoTesting}
-                          onClick={async () => {
-                            setAdoTesting(true);
-                            setAdoTestResult(null);
-                            try {
-                              const resp = await window.electronAPI.adoTestConnection({
-                                organizationUrl: normalizeAdoUrl(adoOrgUrl),
-                                project: adoProject,
-                                pat: adoPat,
-                              });
-                              setAdoTestResult(resp.success && resp.data ? 'success' : 'error');
-                            } catch {
-                              setAdoTestResult('error');
-                            } finally {
-                              setAdoTesting(false);
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium border border-border/60 text-foreground/70 hover:bg-accent/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-                        >
-                          {adoTesting ? 'Testing...' : 'Test Connection'}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!isAdoUrlValid || !adoProject || !adoPat || adoSaving}
-                          onClick={async () => {
-                            setAdoSaving(true);
-                            try {
-                              const normalized = normalizeAdoUrl(adoOrgUrl);
-                              await window.electronAPI.adoSaveConfig({
-                                organizationUrl: normalized,
-                                project: adoProject,
-                                pat: adoPat,
-                              });
-                              setAdoOrgUrl(normalized);
-                              setAdoConfigured(true);
-                            } finally {
-                              setAdoSaving(false);
-                            }
-                          }}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-primary text-primary-foreground hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-                        >
-                          {adoSaving ? 'Saving...' : 'Save'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>

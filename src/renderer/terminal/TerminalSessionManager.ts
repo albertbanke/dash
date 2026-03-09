@@ -336,22 +336,21 @@ export class TerminalSessionManager {
 
         // Show info line when context was injected via SessionStart hook
         if (result.taskContextMeta && !result.reattached && !resume) {
-          const { issueNumbers, gitRemote, adoWorkItems } = result.taskContextMeta;
-          const hasGitHub = issueNumbers.length > 0;
-          const hasAdo = adoWorkItems && adoWorkItems.length > 0;
+          const { githubIssues, adoWorkItems } = result.taskContextMeta;
 
-          if (hasGitHub) {
-            const issueLabels = issueNumbers.map((num) => {
-              const url = gitRemote ? this.issueUrl(gitRemote, num) : null;
+          if (githubIssues && githubIssues.length > 0) {
+            const issueLabels = githubIssues.map((issue) => {
               // OSC 8 hyperlink: \x1b]8;;URL\x07TEXT\x1b]8;;\x07
-              return url ? `\x1b]8;;${url}\x07#${num}\x1b]8;;\x07` : `#${num}`;
+              return issue.url
+                ? `\x1b]8;;${issue.url}\x07#${issue.id}\x1b]8;;\x07`
+                : `#${issue.id}`;
             });
             this.terminal.write(
               `\x1b[2m\x1b[36m● Issue context injected: ${issueLabels.join(', ')}\x1b[0m\r\n`,
             );
           }
 
-          if (hasAdo) {
+          if (adoWorkItems && adoWorkItems.length > 0) {
             const wiLabels = adoWorkItems.map((wi) => {
               return wi.url ? `\x1b]8;;${wi.url}\x07#${wi.id}\x1b]8;;\x07` : `#${wi.id}`;
             });
@@ -548,14 +547,6 @@ export class TerminalSessionManager {
     } catch {
       // Ignore fit errors during transitions
     }
-  }
-
-  private issueUrl(remote: string, num: number): string | null {
-    const ssh = remote.match(/git@github\.com:(.+?)(?:\.git)?$/);
-    if (ssh) return `https://github.com/${ssh[1]}/issues/${num}`;
-    const https = remote.match(/https:\/\/github\.com\/(.+?)(?:\.git)?$/);
-    if (https) return `https://github.com/${https[1]}/issues/${num}`;
-    return null;
   }
 
   private async startPty(resume: boolean = false): Promise<{

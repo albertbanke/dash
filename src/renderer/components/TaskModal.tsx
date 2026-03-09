@@ -14,6 +14,7 @@ export interface CreateTaskOptions {
 
 interface TaskModalProps {
   projectPath: string;
+  projectId?: string;
   onClose: () => void;
   onCreate: (options: CreateTaskOptions) => void;
 }
@@ -70,7 +71,7 @@ function AdoWorkItemRow({ item }: { item: AzureDevOpsWorkItem }) {
   );
 }
 
-export function TaskModal({ projectPath, onClose, onCreate }: TaskModalProps) {
+export function TaskModal({ projectPath, projectId, onClose, onCreate }: TaskModalProps) {
   const [name, setName] = useState('');
   const [useWorktree, setUseWorktree] = useState(true);
   const [autoApprove, setAutoApprove] = useState(() => localStorage.getItem('yoloMode') === 'true');
@@ -101,7 +102,7 @@ export function TaskModal({ projectPath, onClose, onCreate }: TaskModalProps) {
     window.electronAPI.githubCheckAvailable().then((resp) => {
       if (resp.success && resp.data) setGhAvailable(true);
     });
-    window.electronAPI.adoCheckConfigured().then((resp) => {
+    window.electronAPI.adoCheckConfigured(projectId).then((resp) => {
       if (resp.success && resp.data) setAdoAvailable(true);
     });
   }, []);
@@ -134,8 +135,8 @@ export function TaskModal({ projectPath, onClose, onCreate }: TaskModalProps) {
   );
 
   const searchAdoWorkItems = useCallback(
-    (query: string) => window.electronAPI.adoSearchWorkItems(query),
-    [],
+    (query: string) => window.electronAPI.adoSearchWorkItems(query, projectId),
+    [projectId],
   );
 
   async function fetchBranches() {

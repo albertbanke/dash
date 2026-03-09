@@ -1,25 +1,8 @@
 import React from 'react';
 import { TerminalPane } from './TerminalPane';
 import { Terminal, FolderOpen, GitBranch, Globe } from 'lucide-react';
-import type { Project, Task, LinkedItem, RemoteControlState } from '../../shared/types';
-
-/** Convert a git remote URL (SSH or HTTPS) to a GitHub issues base URL */
-function issueUrl(remote: string | null, num: number): string | null {
-  if (!remote) return null;
-  // git@github.com:org/repo.git → https://github.com/org/repo/issues/N
-  const ssh = remote.match(/git@github\.com:(.+?)(?:\.git)?$/);
-  if (ssh) return `https://github.com/${ssh[1]}/issues/${num}`;
-  // https://github.com/org/repo.git → https://github.com/org/repo/issues/N
-  const https = remote.match(/https:\/\/github\.com\/(.+?)(?:\.git)?$/);
-  if (https) return `https://github.com/${https[1]}/issues/${num}`;
-  return null;
-}
-
-/** Get display URL for a linked item */
-function linkedItemUrl(item: LinkedItem, remote: string | null): string | null {
-  if (item.provider === 'ado') return item.url;
-  return item.url || issueUrl(remote, item.id);
-}
+import type { Project, Task, RemoteControlState } from '../../shared/types';
+import { linkedItemUrl } from '../../shared/urls';
 
 interface MainContentProps {
   activeTask: Task | null;

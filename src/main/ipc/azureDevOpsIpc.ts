@@ -4,9 +4,9 @@ import { ConnectionConfigService } from '../services/ConnectionConfigService';
 import type { AzureDevOpsConfig } from '@shared/types';
 
 export function registerAzureDevOpsIpc(): void {
-  ipcMain.handle('ado:check-configured', async () => {
+  ipcMain.handle('ado:check-configured', async (_event, args?: { projectId?: string }) => {
     try {
-      return { success: true, data: ConnectionConfigService.isAdoConfigured() };
+      return { success: true, data: ConnectionConfigService.isAdoConfigured(args?.projectId) };
     } catch (err) {
       return { success: false, error: String(err) };
     }
@@ -21,47 +21,53 @@ export function registerAzureDevOpsIpc(): void {
     }
   });
 
-  ipcMain.handle('ado:save-config', async (_event, args: AzureDevOpsConfig) => {
-    try {
-      ConnectionConfigService.saveAdoConfig(args);
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  });
+  ipcMain.handle(
+    'ado:save-config',
+    async (_event, args: { config: AzureDevOpsConfig; projectId?: string }) => {
+      try {
+        ConnectionConfigService.saveAdoConfig(args.config, args.projectId);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    },
+  );
 
-  ipcMain.handle('ado:get-config', async () => {
+  ipcMain.handle('ado:get-config', async (_event, args?: { projectId?: string }) => {
     try {
-      const config = ConnectionConfigService.getAdoConfig();
+      const config = ConnectionConfigService.getAdoConfig(args?.projectId);
       return { success: true, data: config };
     } catch (err) {
       return { success: false, error: String(err) };
     }
   });
 
-  ipcMain.handle('ado:remove-config', async () => {
+  ipcMain.handle('ado:remove-config', async (_event, args?: { projectId?: string }) => {
     try {
-      ConnectionConfigService.removeAdoConfig();
+      ConnectionConfigService.removeAdoConfig(args?.projectId);
       return { success: true };
     } catch (err) {
       return { success: false, error: String(err) };
     }
   });
 
-  ipcMain.handle('ado:search-work-items', async (_event, args: { query: string }) => {
-    try {
-      const config = ConnectionConfigService.getAdoConfig();
-      if (!config) return { success: false, error: 'Azure DevOps not configured' };
-      const items = await AzureDevOpsService.searchWorkItems(config, args.query);
-      return { success: true, data: items };
-    } catch (err) {
-      return { success: false, error: String(err) };
-    }
-  });
+  ipcMain.handle(
+    'ado:search-work-items',
+    async (_event, args: { query: string; projectId?: string }) => {
+      try {
+        const config = ConnectionConfigService.getAdoConfig(args.projectId);
+        if (!config) return { success: false, error: 'Azure DevOps not configured' };
+        const items = await AzureDevOpsService.searchWorkItems(config, args.query);
+        return { success: true, data: items };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    },
+  );
 
-  ipcMain.handle('ado:get-work-item', async (_event, args: { id: number }) => {
+  ipcMain.handle('ado:get-work-item', async (_event, args: { id: number; projectId?: string }) => {
     try {
-      const config = ConnectionConfigService.getAdoConfig();
+      const config = ConnectionConfigService.getAdoConfig(args.projectId);
       if (!config) return { success: false, error: 'Azure DevOps not configured' };
       const item = await AzureDevOpsService.getWorkItem(config, args.id);
       return { success: true, data: item };
@@ -72,9 +78,9 @@ export function registerAzureDevOpsIpc(): void {
 
   ipcMain.handle(
     'ado:post-branch-comment',
-    async (_event, args: { workItemId: number; branch: string }) => {
+    async (_event, args: { workItemId: number; branch: string; projectId?: string }) => {
       try {
-        const config = ConnectionConfigService.getAdoConfig();
+        const config = ConnectionConfigService.getAdoConfig(args.projectId);
         if (!config) return { success: false, error: 'Azure DevOps not configured' };
         await AzureDevOpsService.postBranchComment(config, args.workItemId, args.branch);
         return { success: true };

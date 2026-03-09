@@ -36,6 +36,7 @@ export function SearchableMultiSelect<T>({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchGenRef = useRef(0);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -74,16 +75,18 @@ export function SearchableMultiSelect<T>({
     (q: string) => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setLoading(true);
+      const gen = ++searchGenRef.current;
       debounceRef.current = setTimeout(async () => {
         try {
           const resp = await onSearch(q);
+          if (gen !== searchGenRef.current) return; // discard stale results
           if (resp.success && resp.data) {
             setResults(resp.data);
           }
         } catch {
           // Best effort
         } finally {
-          setLoading(false);
+          if (gen === searchGenRef.current) setLoading(false);
         }
       }, 400);
     },

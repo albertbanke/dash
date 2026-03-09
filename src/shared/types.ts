@@ -93,10 +93,14 @@ export interface RemoveWorktreeOptions {
   deleteRemoteBranch?: boolean;
 }
 
+export interface TaskContextMetaItem {
+  id: number;
+  url: string;
+}
+
 export interface TaskContextMeta {
-  issueNumbers: number[];
-  gitRemote?: string;
-  adoWorkItems?: Array<{ id: number; url: string }>;
+  githubIssues?: TaskContextMetaItem[];
+  adoWorkItems?: TaskContextMetaItem[];
 }
 
 export interface PtyOptions {
