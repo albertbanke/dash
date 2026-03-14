@@ -1138,6 +1138,10 @@ export function App() {
             projects.find((p) => p.id === (taskModalProjectId || activeProjectId))?.path ?? ''
           }
           projectId={taskModalProjectId || activeProjectId || undefined}
+          gitRemote={
+            projects.find((p) => p.id === (taskModalProjectId || activeProjectId))?.gitRemote ??
+            null
+          }
           onClose={() => setShowTaskModal(false)}
           onCreate={handleCreateTask}
         />

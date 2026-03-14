@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, GitBranch, Zap, ChevronDown, Loader2, AlertCircle, Search, Upload } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
 import type { BranchInfo, GithubIssue, AzureDevOpsWorkItem, LinkedItem } from '../../shared/types';
+import { isAdoRemote } from '../../shared/urls';
 
 export interface CreateTaskOptions {
   name: string;
@@ -15,6 +16,7 @@ export interface CreateTaskOptions {
 interface TaskModalProps {
   projectPath: string;
   projectId?: string;
+  gitRemote: string | null;
   onClose: () => void;
   onCreate: (options: CreateTaskOptions) => void;
 }
@@ -71,7 +73,13 @@ function AdoWorkItemRow({ item }: { item: AzureDevOpsWorkItem }) {
   );
 }
 
-export function TaskModal({ projectPath, projectId, onClose, onCreate }: TaskModalProps) {
+export function TaskModal({
+  projectPath,
+  projectId,
+  gitRemote,
+  onClose,
+  onCreate,
+}: TaskModalProps) {
   const [name, setName] = useState('');
   const [useWorktree, setUseWorktree] = useState(true);
   const [autoApprove, setAutoApprove] = useState(() => localStorage.getItem('yoloMode') === 'true');
@@ -85,27 +93,31 @@ export function TaskModal({ projectPath, projectId, onClose, onCreate }: TaskMod
   const [branchSearch, setBranchSearch] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Issue/work item selection
+  // Issue/work item selection — show only the provider matching the remote
+  const isAdo = isAdoRemote(gitRemote);
   const [ghAvailable, setGhAvailable] = useState(false);
   const [adoAvailable, setAdoAvailable] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<GithubIssue[]>([]);
   const [selectedWorkItems, setSelectedWorkItems] = useState<AzureDevOpsWorkItem[]>([]);
 
-  const showGithub = ghAvailable;
-  const showAdo = adoAvailable;
+  const showGithub = !isAdo && ghAvailable;
+  const showAdo = isAdo && adoAvailable;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Check gh and ADO availability on mount
+  // Check availability only for the provider matching the remote
   useEffect(() => {
-    window.electronAPI.githubCheckAvailable().then((resp) => {
-      if (resp.success && resp.data) setGhAvailable(true);
-    });
-    window.electronAPI.adoCheckConfigured(projectId).then((resp) => {
-      if (resp.success && resp.data) setAdoAvailable(true);
-    });
-  }, []);
+    if (isAdo) {
+      window.electronAPI.adoCheckConfigured(projectId).then((resp) => {
+        if (resp.success && resp.data) setAdoAvailable(true);
+      });
+    } else if (gitRemote) {
+      window.electronAPI.githubCheckAvailable().then((resp) => {
+        if (resp.success && resp.data) setGhAvailable(true);
+      });
+    }
+  }, [isAdo, gitRemote, projectId]);
 
   // Fetch branches when worktree is enabled
   useEffect(() => {
