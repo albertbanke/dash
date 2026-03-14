@@ -1,4 +1,9 @@
-import type { AzureDevOpsConfig, AzureDevOpsWorkItem, AzureDevOpsWorkItemRef } from '@shared/types';
+import type {
+  AzureDevOpsConfig,
+  AzureDevOpsWorkItem,
+  AzureDevOpsWorkItemRef,
+  PullRequestInfo,
+} from '@shared/types';
 
 const TIMEOUT_MS = 15_000;
 const API_VERSION = '7.1';
@@ -75,6 +80,32 @@ export class AzureDevOpsService {
     const items = await this.getWorkItemsByIds(config, [id], { expand: true });
     if (items.length === 0) throw new Error(`Work item ${id} not found`);
     return items[0];
+  }
+
+  static async getPullRequestForBranch(
+    config: AzureDevOpsConfig,
+    repositoryName: string,
+    branch: string,
+  ): Promise<PullRequestInfo | null> {
+    const sourceRef = `refs/heads/${branch}`;
+    const result = (await this.request(
+      config,
+      `${config.project}/_apis/git/repositories/${encodeURIComponent(repositoryName)}/pullrequests?searchCriteria.sourceRefName=${encodeURIComponent(sourceRef)}&searchCriteria.status=active&$top=1`,
+    )) as { value?: Array<{ pullRequestId: number; title: string; url?: string }> };
+
+    const prs = result.value;
+    if (!prs || prs.length === 0) return null;
+
+    const pr = prs[0];
+    const baseUrl = config.organizationUrl.replace(/\/+$/, '');
+    const prUrl = `${baseUrl}/${config.project}/_git/${repositoryName}/pullrequest/${pr.pullRequestId}`;
+
+    return {
+      number: pr.pullRequestId,
+      title: pr.title,
+      url: prUrl,
+      provider: 'ado',
+    };
   }
 
   static async postBranchComment(

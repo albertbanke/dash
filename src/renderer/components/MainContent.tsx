@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { TerminalPane } from './TerminalPane';
-import { Terminal, FolderOpen, GitBranch, Globe } from 'lucide-react';
-import type { Project, Task, RemoteControlState } from '../../shared/types';
-import { linkedItemUrl } from '../../shared/urls';
+import { Terminal, FolderOpen, GitBranch, Globe, GitPullRequest } from 'lucide-react';
+import type { Project, Task, RemoteControlState, PullRequestInfo } from '../../shared/types';
+import { linkedItemUrl, isAdoRemote } from '../../shared/urls';
 
 interface MainContentProps {
   activeTask: Task | null;
@@ -27,6 +27,43 @@ export function MainContent({
   onSelectTask,
   onEnableRemoteControl,
 }: MainContentProps) {
+  const [prInfo, setPrInfo] = useState<PullRequestInfo | null>(null);
+
+  useEffect(() => {
+    setPrInfo(null);
+
+    if (!activeTask?.branch || !activeProject) {
+      return;
+    }
+
+    let cancelled = false;
+    const branch = activeTask.branch;
+    const remote = activeProject.gitRemote;
+
+    (async () => {
+      try {
+        let pr: PullRequestInfo | null = null;
+
+        if (remote && isAdoRemote(remote)) {
+          const resp = await window.electronAPI.adoGetPrForBranch(branch, remote, activeProject.id);
+          if (!cancelled && resp.success) pr = resp.data ?? null;
+        } else {
+          const cwd = activeTask.path || activeProject.path;
+          const resp = await window.electronAPI.githubGetPrForBranch(cwd, branch);
+          if (!cancelled && resp.success) pr = resp.data ?? null;
+        }
+
+        if (!cancelled) setPrInfo(pr);
+      } catch {
+        if (!cancelled) setPrInfo(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTask?.id, activeTask?.branch, activeProject?.id, activeProject?.gitRemote]);
+
   if (!activeProject) {
     return (
       <div className="h-full flex items-center justify-center bg-background">
@@ -153,19 +190,33 @@ export function MainContent({
               })}
             </div>
           ) : null}
-          {taskActivity[activeTask.id] && (
-            <button
-              onClick={() => onEnableRemoteControl?.(activeTask.id)}
-              className={`ml-auto p-1 rounded-md transition-colors ${
-                remoteControlStates[activeTask.id]
-                  ? 'text-primary hover:bg-primary/10'
-                  : 'text-muted-foreground/50 hover:text-foreground hover:bg-accent/60'
-              }`}
-              title="Remote control"
-            >
-              <Globe size={14} strokeWidth={1.8} />
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-1.5">
+            {prInfo && (
+              <a
+                href={prInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-medium hover:bg-green-500/20 transition-colors"
+                title={prInfo.title}
+              >
+                <GitPullRequest size={10} strokeWidth={2} />
+                PR #{prInfo.number}
+              </a>
+            )}
+            {taskActivity[activeTask.id] && (
+              <button
+                onClick={() => onEnableRemoteControl?.(activeTask.id)}
+                className={`p-1 rounded-md transition-colors ${
+                  remoteControlStates[activeTask.id]
+                    ? 'text-primary hover:bg-primary/10'
+                    : 'text-muted-foreground/50 hover:text-foreground hover:bg-accent/60'
+                }`}
+                title="Remote control"
+              >
+                <Globe size={14} strokeWidth={1.8} />
+              </button>
+            )}
+          </div>
         </>
       )}
     </div>

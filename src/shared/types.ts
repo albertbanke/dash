@@ -263,6 +263,15 @@ export interface AzureDevOpsConfig {
   pat: string;
 }
 
+// ── Pull Request Types ──────────────────────────────────────
+
+export interface PullRequestInfo {
+  number: number;
+  title: string;
+  url: string;
+  provider: 'github' | 'ado';
+}
+
 // ── Remote Control Types ────────────────────────────────────
 
 export interface RemoteControlState {

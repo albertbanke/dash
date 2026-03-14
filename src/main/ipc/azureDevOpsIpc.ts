@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { AzureDevOpsService } from '../services/AzureDevOpsService';
 import { ConnectionConfigService } from '../services/ConnectionConfigService';
 import type { AzureDevOpsConfig } from '@shared/types';
+import { parseAdoRemote } from '@shared/urls';
 
 export function registerAzureDevOpsIpc(): void {
   ipcMain.handle('ado:check-configured', async (_event, args?: { projectId?: string }) => {
@@ -75,6 +76,27 @@ export function registerAzureDevOpsIpc(): void {
       return { success: false, error: String(err) };
     }
   });
+
+  ipcMain.handle(
+    'ado:get-pr-for-branch',
+    async (_event, args: { branch: string; gitRemote: string; projectId?: string }) => {
+      try {
+        const config = ConnectionConfigService.getAdoConfig(args.projectId);
+        if (!config) return { success: false, error: 'Azure DevOps not configured' };
+        const parsed = parseAdoRemote(args.gitRemote);
+        if (!parsed?.repository)
+          return { success: false, error: 'Could not determine repository from remote' };
+        const pr = await AzureDevOpsService.getPullRequestForBranch(
+          config,
+          parsed.repository,
+          args.branch,
+        );
+        return { success: true, data: pr };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    },
+  );
 
   ipcMain.handle(
     'ado:post-branch-comment',

@@ -15,6 +15,7 @@ import type {
   CommitDetail,
   RemoteControlState,
   TaskContextMeta,
+  PullRequestInfo,
 } from '../shared/types';
 
 export interface ElectronAPI {
@@ -168,6 +169,10 @@ export interface ElectronAPI {
     issueNumber: number,
     branch: string,
   ) => Promise<IpcResponse<void>>;
+  githubGetPrForBranch: (
+    cwd: string,
+    branch: string,
+  ) => Promise<IpcResponse<PullRequestInfo | null>>;
 
   // Azure DevOps
   adoCheckConfigured: (projectId?: string) => Promise<IpcResponse<boolean>>;
@@ -185,6 +190,11 @@ export interface ElectronAPI {
     branch: string,
     projectId?: string,
   ) => Promise<IpcResponse<void>>;
+  adoGetPrForBranch: (
+    branch: string,
+    gitRemote: string,
+    projectId?: string,
+  ) => Promise<IpcResponse<PullRequestInfo | null>>;
 
   // Git detection
   detectGit: (

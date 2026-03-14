@@ -11,24 +11,30 @@ export function registerGithubIpc(): void {
     }
   });
 
-  ipcMain.handle(
-    'github:search-issues',
-    async (_event, args: { cwd: string; query: string }) => {
-      try {
-        const issues = await GithubService.searchIssues(args.cwd, args.query);
-        return { success: true, data: issues };
-      } catch (err) {
-        return { success: false, error: String(err) };
-      }
-    },
-  );
+  ipcMain.handle('github:search-issues', async (_event, args: { cwd: string; query: string }) => {
+    try {
+      const issues = await GithubService.searchIssues(args.cwd, args.query);
+      return { success: true, data: issues };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle('github:get-issue', async (_event, args: { cwd: string; number: number }) => {
+    try {
+      const issue = await GithubService.getIssue(args.cwd, args.number);
+      return { success: true, data: issue };
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  });
 
   ipcMain.handle(
-    'github:get-issue',
-    async (_event, args: { cwd: string; number: number }) => {
+    'github:get-pr-for-branch',
+    async (_event, args: { cwd: string; branch: string }) => {
       try {
-        const issue = await GithubService.getIssue(args.cwd, args.number);
-        return { success: true, data: issue };
+        const pr = await GithubService.getPullRequestForBranch(args.cwd, args.branch);
+        return { success: true, data: pr };
       } catch (err) {
         return { success: false, error: String(err) };
       }

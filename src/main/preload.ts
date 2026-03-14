@@ -139,6 +139,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('github:post-branch-comment', { cwd, issueNumber, branch }),
   githubLinkBranch: (cwd: string, issueNumber: number, branch: string) =>
     ipcRenderer.invoke('github:link-branch', { cwd, issueNumber, branch }),
+  githubGetPrForBranch: (cwd: string, branch: string) =>
+    ipcRenderer.invoke('github:get-pr-for-branch', { cwd, branch }),
 
   // Azure DevOps
   adoCheckConfigured: (projectId?: string) =>
@@ -154,6 +156,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ado:get-work-item', { id, projectId }),
   adoPostBranchComment: (workItemId: number, branch: string, projectId?: string) =>
     ipcRenderer.invoke('ado:post-branch-comment', { workItemId, branch, projectId }),
+  adoGetPrForBranch: (branch: string, gitRemote: string, projectId?: string) =>
+    ipcRenderer.invoke('ado:get-pr-for-branch', { branch, gitRemote, projectId }),
 
   // Git detection
   detectGit: (folderPath: string) => ipcRenderer.invoke('app:detectGit', folderPath),

@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import type { GithubIssue } from '@shared/types';
+import type { GithubIssue, PullRequestInfo } from '@shared/types';
 
 const execFileAsync = promisify(execFile);
 
@@ -39,24 +39,35 @@ export class GithubService {
   static async getIssue(cwd: string, number: number): Promise<GithubIssue> {
     const { stdout } = await execFileAsync(
       'gh',
-      [
-        'issue',
-        'view',
-        String(number),
-        '--json',
-        'number,title,labels,state,body,url,assignees',
-      ],
+      ['issue', 'view', String(number), '--json', 'number,title,labels,state,body,url,assignees'],
       { cwd, timeout: TIMEOUT_MS, env: process.env as Record<string, string> },
     );
 
     return mapIssue(JSON.parse(stdout));
   }
 
-  static async postBranchComment(
+  static async getPullRequestForBranch(
     cwd: string,
-    issueNumber: number,
     branch: string,
-  ): Promise<void> {
+  ): Promise<PullRequestInfo | null> {
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['pr', 'list', '--head', branch, '--json', 'number,title,url', '--limit', '1'],
+      { cwd, timeout: TIMEOUT_MS, env: process.env as Record<string, string> },
+    );
+
+    const prs = JSON.parse(stdout);
+    if (!Array.isArray(prs) || prs.length === 0) return null;
+
+    return {
+      number: prs[0].number,
+      title: prs[0].title,
+      url: prs[0].url,
+      provider: 'github',
+    };
+  }
+
+  static async postBranchComment(cwd: string, issueNumber: number, branch: string): Promise<void> {
     const body = `A task branch has been created for this issue:\n\n\`\`\`\n${branch}\n\`\`\``;
     await execFileAsync('gh', ['issue', 'comment', String(issueNumber), '--body', body], {
       cwd,
@@ -71,11 +82,7 @@ export class GithubService {
    * Must be called before the branch is pushed to the remote.
    * Returns the issue URL on success.
    */
-  static async linkBranch(
-    cwd: string,
-    issueNumber: number,
-    branch: string,
-  ): Promise<string> {
+  static async linkBranch(cwd: string, issueNumber: number, branch: string): Promise<string> {
     // Resolve owner/repo from the local git remote
     const { stdout: nwo } = await execFileAsync(
       'gh',
@@ -96,11 +103,16 @@ export class GithubService {
     const { stdout: idsRaw } = await execFileAsync(
       'gh',
       [
-        'api', 'graphql',
-        '-F', `owner=${owner}`,
-        '-F', `repo=${repo}`,
-        '-F', `number=${issueNumber}`,
-        '-f', `query=${query}`,
+        'api',
+        'graphql',
+        '-F',
+        `owner=${owner}`,
+        '-F',
+        `repo=${repo}`,
+        '-F',
+        `number=${issueNumber}`,
+        '-f',
+        `query=${query}`,
       ],
       { cwd, timeout: TIMEOUT_MS, env: process.env as Record<string, string> },
     );
@@ -113,11 +125,10 @@ export class GithubService {
     }
 
     // Resolve the branch OID from the local repo
-    const { stdout: oid } = await execFileAsync(
-      'git',
-      ['rev-parse', branch],
-      { cwd, timeout: TIMEOUT_MS },
-    );
+    const { stdout: oid } = await execFileAsync('git', ['rev-parse', branch], {
+      cwd,
+      timeout: TIMEOUT_MS,
+    });
 
     // createLinkedBranch creates the branch on the remote and links it to the issue
     const mutation = `
@@ -135,12 +146,18 @@ export class GithubService {
     await execFileAsync(
       'gh',
       [
-        'api', 'graphql',
-        '-F', `repoId=${repoId}`,
-        '-F', `issueId=${issueId}`,
-        '-F', `oid=${oid.trim()}`,
-        '-F', `branch=${branch}`,
-        '-f', `query=${mutation}`,
+        'api',
+        'graphql',
+        '-F',
+        `repoId=${repoId}`,
+        '-F',
+        `issueId=${issueId}`,
+        '-F',
+        `oid=${oid.trim()}`,
+        '-F',
+        `branch=${branch}`,
+        '-f',
+        `query=${mutation}`,
       ],
       { cwd, timeout: TIMEOUT_MS, env: process.env as Record<string, string> },
     );
@@ -154,8 +171,8 @@ function mapIssue(raw: Record<string, unknown>): GithubIssue {
     ? raw.labels.map((l: Record<string, unknown>) => (typeof l === 'string' ? l : l.name) as string)
     : [];
   const assignees = Array.isArray(raw.assignees)
-    ? raw.assignees.map((a: Record<string, unknown>) =>
-        (typeof a === 'string' ? a : a.login) as string,
+    ? raw.assignees.map(
+        (a: Record<string, unknown>) => (typeof a === 'string' ? a : a.login) as string,
       )
     : [];
 
