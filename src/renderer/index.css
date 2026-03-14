@@ -117,12 +117,29 @@
 .terminal-container .xterm {
   height: 100%;
   padding-left: 12px;
+  padding-top: 10px;
 }
 
 /* Inset left edge of absolutely-positioned children to match left padding. */
 .terminal-container .xterm .xterm-viewport,
 .terminal-container .xterm .xterm-screen {
   left: 12px !important;
+  top: 10px !important;
+}
+
+/* Inset scrollbar away from resize handle */
+.terminal-container .xterm .xterm-viewport {
+  right: 8px !important;
+}
+
+/* Let pointer events fall through the screen to the viewport scrollbar.
+   Canvas children re-enable events so terminal interaction still works. */
+.terminal-container .xterm .xterm-screen {
+  pointer-events: none;
+}
+.terminal-container .xterm .xterm-screen canvas,
+.terminal-container .xterm .xterm-screen .xterm-decoration-container {
+  pointer-events: auto;
 }
 
 /* Sidebar shell terminal: tighter padding */
