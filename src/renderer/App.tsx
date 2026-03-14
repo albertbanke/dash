@@ -1131,6 +1131,12 @@ export function App() {
               prev?.id === id ? { ...prev, name: newName } : prev,
             );
           }}
+          onWorktreeSetupScriptChange={async (id, script) => {
+            const proj = projects.find((p) => p.id === id);
+            if (!proj) return;
+            await window.electronAPI.saveProject({ ...proj, worktreeSetupScript: script });
+            await loadProjects();
+          }}
         />
       )}
 
