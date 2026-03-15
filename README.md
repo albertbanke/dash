@@ -8,19 +8,21 @@ The main idea: you open a project, create tasks, and each task gets an isolated 
 
 ## What it does
 
-- **Project management** — Open any git repo as a project, or clone from a URL. Tasks are nested under projects in the sidebar.
+- **Project management** — Open any git repo as a project, or clone from a URL. Tasks are nested under projects in the sidebar. Drag-and-drop to reorder projects. Project overview dashboard shows all tasks, activity status, and quick actions.
 - **Git worktrees** — Each task gets its own worktree and branch. A reserve pool pre-creates worktrees so new tasks start instantly (<100ms). Per-project setup scripts run automatically after worktree creation (e.g. `pnpm install`, copying `.env`).
-- **Terminal** — Full PTY terminal per task. Sessions persist when switching between tasks (state is snapshotted and restored). Shift+Enter sends multiline input. File drag-drop pastes paths. 16 terminal themes.
+- **Terminal** — Full PTY terminal per task. Sessions persist when switching between tasks (state is snapshotted and restored). Shift+Enter sends multiline input. File drag-drop pastes paths. Clickable file paths open in your IDE. 16 terminal themes.
 - **Shell drawer** — Separate shell terminal alongside the task terminal. Configurable position (left, right, or replacing main content).
 - **File changes panel** — Real-time git status with staged/unstaged sections. Stage, unstage, discard per-file. Click to view diffs.
 - **Diff viewer** — Full file or configurable context lines. Unified diff with syntax highlighting. Select lines to add inline comments and send them to the terminal.
 - **Commit graph** — Visualize branch history with a DAG-style commit graph per project.
-- **GitHub issues** — Search and link issues to tasks. Auto-posts branch comments on linked issues.
+- **GitHub issues** — Search and link issues to tasks. Auto-posts branch comments on linked issues. PR link badge in task header.
+- **Azure DevOps** — Search and link ADO work items to tasks. PR detection and branch comments. Per-project ADO configuration with PAT token storage.
 - **Remote control** — Generate a QR code / URL to control a task's terminal from another device.
 - **Activity indicators** — Busy (amber) and idle (green) status per task, with desktop notifications and sound alerts (chime, cash, ping, droplet, marimba).
-- **Editor integration** — Open changed files in your editor (Cursor, VS Code, Zed, Vim) with line navigation.
+- **Editor integration** — Open changed files in your editor (Cursor, VS Code, Zed, Vim) with line navigation. Clickable file paths in terminal output.
 - **Commit attribution** — Configurable co-author line on commits (default, none, or custom text).
 - **Task archiving** — Archive inactive tasks to keep the sidebar clean; restore when needed.
+- **Auto-update** — Background update checking with manual download and install.
 - **Customizable keybindings** — Remap any shortcut from Settings.
 - **Dark/light theme**
 
@@ -35,7 +37,7 @@ Download the latest build from [Releases](https://github.com/syv-ai/dash/release
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`npm install -g @anthropic-ai/claude-code`)
 - Git
 
-## Setup
+## Development setup
 
 ```bash
 pnpm install
@@ -81,33 +83,52 @@ src/
 │   │   ├── migrate.ts      # SQL migration runner
 │   │   └── path.ts         # DB file location
 │   ├── ipc/                # IPC handlers
-│   │   ├── appIpc.ts       # Dialogs, CLI detection
+│   │   ├── appIpc.ts       # Dialogs, CLI/IDE detection
 │   │   ├── dbIpc.ts        # CRUD for projects/tasks/conversations
-│   │   ├── gitIpc.ts       # Git status, diff, stage/unstage
+│   │   ├── gitIpc.ts       # Git status, diff, stage/unstage, commit graph
 │   │   ├── ptyIpc.ts       # Terminal spawn/kill/resize
-│   │   └── worktreeIpc.ts  # Worktree create/remove/claim
+│   │   ├── worktreeIpc.ts  # Worktree create/remove/claim
+│   │   ├── githubIpc.ts    # GitHub issues, PRs, branch comments
+│   │   ├── azureDevOpsIpc.ts # ADO work items, PRs, config
+│   │   └── autoUpdateIpc.ts  # Check/download/install updates
 │   └── services/
 │       ├── DatabaseService.ts
 │       ├── GitService.ts
+│       ├── GithubService.ts
+│       ├── AzureDevOpsService.ts
+│       ├── ConnectionConfigService.ts
+│       ├── AutoUpdateService.ts
 │       ├── FileWatcherService.ts
 │       ├── WorktreeService.ts
 │       ├── WorktreePoolService.ts
 │       ├── ptyManager.ts
-│       └── TerminalSnapshotService.ts
+│       ├── TerminalSnapshotService.ts
+│       ├── HookServer.ts
+│       ├── ActivityMonitor.ts
+│       └── remoteControlService.ts
 ├── renderer/               # React UI
 │   ├── App.tsx             # Root: state, keyboard shortcuts, layout
 │   ├── keybindings.ts      # Keybinding system (defaults, load/save, matching)
 │   ├── components/
 │   │   ├── LeftSidebar.tsx  # Projects + nested tasks
-│   │   ├── MainContent.tsx  # Terminal area
+│   │   ├── MainContent.tsx  # Terminal area + project overview
+│   │   ├── ProjectOverview.tsx  # Project dashboard
 │   │   ├── FileChangesPanel.tsx
 │   │   ├── DiffViewer.tsx
 │   │   ├── TaskModal.tsx
 │   │   ├── SettingsModal.tsx
-│   │   └── TerminalPane.tsx
+│   │   ├── ProjectSettingsModal.tsx
+│   │   ├── DeleteProjectModal.tsx
+│   │   ├── RemoteControlModal.tsx
+│   │   ├── AdoSetupModal.tsx
+│   │   ├── CommitGraph/    # DAG-style commit graph visualization
+│   │   ├── TerminalPane.tsx
+│   │   ├── TerminalDrawer.tsx
+│   │   └── ShellDrawerWrapper.tsx
 │   └── terminal/
 │       ├── TerminalSessionManager.ts  # xterm.js lifecycle
-│       └── SessionRegistry.ts         # Session pool (preserves state on task switch)
+│       ├── SessionRegistry.ts         # Session pool (preserves state on task switch)
+│       └── FilePathLinkProvider.ts    # Clickable file paths → IDE
 ├── shared/
 │   └── types.ts            # Shared types (Project, Task, GitStatus, etc.)
 └── types/
@@ -134,7 +155,7 @@ All keybindings are customizable in Settings > Keybindings.
 
 |          |                                       |
 | -------- | ------------------------------------- |
-| Shell    | Electron 30                           |
+| Shell    | Electron 30, electron-updater         |
 | UI       | React 18, TypeScript, Tailwind CSS 3  |
 | Build    | Vite 5, pnpm                          |
 | Terminal | xterm.js + node-pty                   |
