@@ -5,6 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import type { TerminalSnapshot } from '../../shared/types';
 import { FilePathLinkProvider } from './FilePathLinkProvider';
 import { darkTheme, lightTheme, resolveTheme } from './terminalThemes';
+import { gpuContextBudget } from './GpuContextBudget';
 
 const SNAPSHOT_DEBOUNCE_MS = 10_000;
 const MEMORY_LIMIT_BYTES = 128 * 1024 * 1024; // 128MB soft limit
@@ -46,6 +47,7 @@ export class TerminalSessionManager {
   private savedViewportY: number | null = null;
   readonly shellOnly: boolean;
   private themeId: string;
+  private usingGpuAddon = false;
   constructor(opts: {
     id: string;
     cwd: string;
@@ -177,27 +179,40 @@ export class TerminalSessionManager {
   }
 
   private async loadGpuAddon() {
-    // On Linux, WebGL has compositing bugs that cause the terminal canvas to
-    // go blank when content updates (typing, output). Skip straight to Canvas.
+    // On Linux, both WebGL and Canvas addons trigger Chromium GPU compositing
+    // errors (GetVSyncParametersIfAvailable failures, blank canvases). Use the
+    // built-in DOM renderer which works reliably across all Linux GPU drivers.
     const isLinux = navigator.userAgent.includes('Linux');
+    if (isLinux) return;
 
-    if (!isLinux) {
-      try {
-        const { WebglAddon } = await import('@xterm/addon-webgl');
-        const webgl = new WebglAddon();
-        webgl.onContextLoss(() => {
-          webgl.dispose();
-        });
-        this.terminal.loadAddon(webgl);
-        return;
-      } catch {
-        // Fall through to canvas
-      }
+    if (!gpuContextBudget.canAllocate()) {
+      // No GPU slots available — fall back to DOM renderer
+      return;
+    }
+
+    try {
+      const { WebglAddon } = await import('@xterm/addon-webgl');
+      const webgl = new WebglAddon();
+      webgl.onContextLoss(() => {
+        webgl.dispose();
+        if (this.usingGpuAddon) {
+          this.usingGpuAddon = false;
+          gpuContextBudget.release();
+        }
+      });
+      this.terminal.loadAddon(webgl);
+      this.usingGpuAddon = true;
+      gpuContextBudget.allocate();
+      return;
+    } catch {
+      // Fall through to canvas
     }
 
     try {
       const { CanvasAddon } = await import('@xterm/addon-canvas');
       this.terminal.loadAddon(new CanvasAddon());
+      this.usingGpuAddon = true;
+      gpuContextBudget.allocate();
     } catch {
       // Software renderer fallback
     }
@@ -507,6 +522,11 @@ export class TerminalSessionManager {
 
     if (this.unsubData) this.unsubData();
     if (this.unsubExit) this.unsubExit();
+
+    if (this.usingGpuAddon) {
+      this.usingGpuAddon = false;
+      gpuContextBudget.release();
+    }
 
     window.electronAPI.ptyKill(this.id);
     this.terminal.dispose();
