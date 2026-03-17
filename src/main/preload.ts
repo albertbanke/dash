@@ -206,6 +206,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
 
+  // Pixel Agents
+  pixelAgentsStart: (config: { name: string; token: string; serverUrl?: string }) =>
+    ipcRenderer.invoke('pixelAgents:start', config),
+  pixelAgentsStop: () => ipcRenderer.invoke('pixelAgents:stop'),
+  pixelAgentsGetStatus: () => ipcRenderer.invoke('pixelAgents:getStatus'),
+  pixelAgentsReadConfig: () => ipcRenderer.invoke('pixelAgents:readConfig'),
+
   // Auto-update
   autoUpdateCheck: () => ipcRenderer.invoke('autoUpdate:check'),
   autoUpdateDownload: () => ipcRenderer.invoke('autoUpdate:download'),

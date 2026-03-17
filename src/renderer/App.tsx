@@ -102,6 +102,38 @@ export function App() {
     if (stored === null) return undefined; // "default" — key absent
     return stored; // '' for "none", or custom text
   });
+  const [pixelAgentsName, setPixelAgentsName] = useState(() => {
+    return localStorage.getItem('pixelAgentsName') || '';
+  });
+  const [pixelAgentsToken, setPixelAgentsToken] = useState(() => {
+    return localStorage.getItem('pixelAgentsToken') || '';
+  });
+  const [pixelAgentsServer, setPixelAgentsServer] = useState(() => {
+    return localStorage.getItem('pixelAgentsServer') || '';
+  });
+  const [pixelAgentsEnabled, setPixelAgentsEnabled] = useState(() => {
+    return localStorage.getItem('pixelAgentsEnabled') === 'true';
+  });
+  // Load pixel agents config from ~/.pixel-agents/.env on mount
+  useEffect(() => {
+    window.electronAPI.pixelAgentsReadConfig().then((resp) => {
+      if (resp.success && resp.data) {
+        const { name, token, serverUrl } = resp.data;
+        if (name && !localStorage.getItem('pixelAgentsName')) {
+          setPixelAgentsName(name);
+          localStorage.setItem('pixelAgentsName', name);
+        }
+        if (token && !localStorage.getItem('pixelAgentsToken')) {
+          setPixelAgentsToken(token);
+          localStorage.setItem('pixelAgentsToken', token);
+        }
+        if (serverUrl && !localStorage.getItem('pixelAgentsServer')) {
+          setPixelAgentsServer(serverUrl);
+          localStorage.setItem('pixelAgentsServer', serverUrl);
+        }
+      }
+    });
+  }, []);
   // Sync desktop notification settings to main process
   useEffect(() => {
     window.electronAPI.setDesktopNotification?.({
@@ -112,6 +144,18 @@ export function App() {
   useEffect(() => {
     window.electronAPI.setCommitAttribution?.(commitAttribution);
   }, [commitAttribution]);
+  // Sync pixel agents watcher to main process
+  useEffect(() => {
+    if (pixelAgentsEnabled && pixelAgentsName.trim() && pixelAgentsToken.trim()) {
+      window.electronAPI.pixelAgentsStart({
+        name: pixelAgentsName.trim(),
+        token: pixelAgentsToken.trim(),
+        serverUrl: pixelAgentsServer.trim() || undefined,
+      });
+    } else {
+      window.electronAPI.pixelAgentsStop();
+    }
+  }, [pixelAgentsEnabled, pixelAgentsName, pixelAgentsToken, pixelAgentsServer]);
 
   // Activity state — keys are PTY IDs that have active sessions
   const [taskActivity, setTaskActivity] = useState<Record<string, 'busy' | 'idle' | 'waiting'>>({});
@@ -1297,6 +1341,26 @@ export function App() {
           onKeybindingsChange={(b) => {
             setKeybindings(b);
             saveKeybindings(b);
+          }}
+          pixelAgentsName={pixelAgentsName}
+          onPixelAgentsNameChange={(v) => {
+            setPixelAgentsName(v);
+            localStorage.setItem('pixelAgentsName', v);
+          }}
+          pixelAgentsToken={pixelAgentsToken}
+          onPixelAgentsTokenChange={(v) => {
+            setPixelAgentsToken(v);
+            localStorage.setItem('pixelAgentsToken', v);
+          }}
+          pixelAgentsServer={pixelAgentsServer}
+          onPixelAgentsServerChange={(v) => {
+            setPixelAgentsServer(v);
+            localStorage.setItem('pixelAgentsServer', v);
+          }}
+          pixelAgentsEnabled={pixelAgentsEnabled}
+          onPixelAgentsEnabledChange={(v) => {
+            setPixelAgentsEnabled(v);
+            localStorage.setItem('pixelAgentsEnabled', String(v));
           }}
           onClose={() => setShowSettings(false)}
         />

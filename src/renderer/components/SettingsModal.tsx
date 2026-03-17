@@ -37,6 +37,14 @@ interface SettingsModalProps {
   activeProjectPath?: string;
   keybindings: KeyBindingMap;
   onKeybindingsChange: (bindings: KeyBindingMap) => void;
+  pixelAgentsName: string;
+  onPixelAgentsNameChange: (value: string) => void;
+  pixelAgentsToken: string;
+  onPixelAgentsTokenChange: (value: string) => void;
+  pixelAgentsServer: string;
+  onPixelAgentsServerChange: (value: string) => void;
+  pixelAgentsEnabled: boolean;
+  onPixelAgentsEnabledChange: (value: boolean) => void;
   onClose: () => void;
 }
 
@@ -138,6 +146,14 @@ export function SettingsModal({
   activeProjectPath,
   keybindings,
   onKeybindingsChange,
+  pixelAgentsName,
+  onPixelAgentsNameChange,
+  pixelAgentsToken,
+  onPixelAgentsTokenChange,
+  pixelAgentsServer,
+  onPixelAgentsServerChange,
+  pixelAgentsEnabled,
+  onPixelAgentsEnabledChange,
   onClose,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<'general' | 'appearance' | 'keybindings'>('general');
@@ -152,6 +168,26 @@ export function SettingsModal({
     'idle' | 'checking' | 'available' | 'downloading' | 'ready'
   >('idle');
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [pixelAgentsStatus, setPixelAgentsStatus] = useState<{
+    running: boolean;
+    connected: boolean;
+    agentCount: number;
+    status: 'stopped' | 'installing' | 'running' | 'error';
+    error: string | null;
+    installed: boolean;
+  } | null>(null);
+
+  // Poll pixel agents status while settings is open
+  useEffect(() => {
+    const poll = () => {
+      window.electronAPI.pixelAgentsGetStatus().then((resp) => {
+        if (resp.success && resp.data) setPixelAgentsStatus(resp.data);
+      });
+    };
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const cleanups = [
@@ -340,6 +376,103 @@ export function SettingsModal({
                 </button>
                 <p className="text-[10px] text-foreground/80 mt-2">
                   Notification will include the task name
+                </p>
+              </div>
+
+              {/* Pixel Agents */}
+              <div>
+                <label className="block text-[12px] font-medium text-foreground mb-3">
+                  Pixel Agents
+                </label>
+                <button
+                  onClick={() => onPixelAgentsEnabledChange(!pixelAgentsEnabled)}
+                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-[13px] border transition-all duration-150 ${
+                    pixelAgentsEnabled
+                      ? 'border-primary/40 bg-primary/8 text-foreground ring-1 ring-primary/20'
+                      : 'border-border/60 text-foreground/60 hover:bg-accent/40 hover:text-foreground'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 flex-shrink-0 ${
+                      pixelAgentsEnabled ? 'bg-primary' : 'bg-border'
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                        pixelAgentsEnabled ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                      }`}
+                    />
+                  </div>
+                  Stream agent activity to pixel office
+                </button>
+                {pixelAgentsEnabled && (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label className="block text-[11px] text-foreground/60 mb-1.5">
+                        Your Name
+                      </label>
+                      <input
+                        type="text"
+                        value={pixelAgentsName}
+                        onChange={(e) => onPixelAgentsNameChange(e.target.value)}
+                        placeholder="e.g. Alice"
+                        className="w-full px-3 py-2.5 rounded-lg text-[12px] border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-foreground/60 mb-1.5">
+                        Token
+                      </label>
+                      <input
+                        type="password"
+                        value={pixelAgentsToken}
+                        onChange={(e) => onPixelAgentsTokenChange(e.target.value)}
+                        placeholder="Ask your team for the token"
+                        className="w-full px-3 py-2.5 rounded-lg text-[12px] font-mono border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-foreground/60 mb-1.5">
+                        Server URL
+                        <span className="text-foreground/30 ml-1">(optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={pixelAgentsServer}
+                        onChange={(e) => onPixelAgentsServerChange(e.target.value)}
+                        placeholder="wss://kontoret.syv.ai"
+                        className="w-full px-3 py-2.5 rounded-lg text-[12px] font-mono border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+                      />
+                    </div>
+                    {pixelAgentsStatus && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border/40 bg-[hsl(var(--surface-2))]">
+                        <div
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            pixelAgentsStatus.status === 'running'
+                              ? 'bg-[hsl(var(--git-added))]'
+                              : pixelAgentsStatus.status === 'installing'
+                                ? 'bg-[hsl(var(--git-modified))] animate-pulse'
+                                : pixelAgentsStatus.status === 'error'
+                                  ? 'bg-[hsl(var(--git-deleted))]'
+                                  : 'bg-border'
+                          }`}
+                        />
+                        <span className="text-[11px] text-foreground/60">
+                          {pixelAgentsStatus.status === 'running'
+                            ? 'Running'
+                            : pixelAgentsStatus.status === 'installing'
+                              ? 'Installing pixel-agents...'
+                              : pixelAgentsStatus.status === 'error'
+                                ? pixelAgentsStatus.error || 'Error'
+                                : 'Not running'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p className="text-[10px] text-foreground/80 mt-2">
+                  Stream agent activity to a shared pixel art office.
+                  Config is saved to ~/.pixel-agents/.env
                 </p>
               </div>
 

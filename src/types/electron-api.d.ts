@@ -245,6 +245,27 @@ export interface ElectronAPI {
   gitUnwatch: (id: string) => Promise<IpcResponse<void>>;
   onGitFileChanged: (callback: (id: string) => void) => () => void;
 
+  // Pixel Agents
+  pixelAgentsStart: (config: {
+    name: string;
+    token: string;
+    serverUrl?: string;
+  }) => Promise<IpcResponse<null>>;
+  pixelAgentsStop: () => Promise<IpcResponse<null>>;
+  pixelAgentsGetStatus: () => Promise<
+    IpcResponse<{
+      running: boolean;
+      connected: boolean;
+      agentCount: number;
+      status: 'stopped' | 'installing' | 'running' | 'error';
+      error: string | null;
+      installed: boolean;
+    }>
+  >;
+  pixelAgentsReadConfig: () => Promise<
+    IpcResponse<{ name: string; token: string; serverUrl?: string } | null>
+  >;
+
   // Auto-update
   autoUpdateCheck: () => Promise<IpcResponse<void>>;
   autoUpdateDownload: () => Promise<IpcResponse<void>>;
