@@ -140,8 +140,15 @@ function KeyRecorder({
   );
 }
 
-function getViewerUrl(wsUrl: string): string {
-  return wsUrl.replace('wss://', 'https://').replace('ws://', 'http://') + '/office/';
+function getViewerUrl(wsUrl: string): string | null {
+  const httpUrl = wsUrl.replace('wss://', 'https://').replace('ws://', 'http://') + '/office/';
+  try {
+    const parsed = new URL(httpUrl);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
 }
 
 function OfficeStatusDot({ status }: { status: PixelAgentsOfficeStatus | undefined }) {
@@ -287,7 +294,10 @@ function PixelAgentsSection({
                 <div className="flex items-center gap-1">
                   <Tooltip content="Open in browser">
                     <button
-                      onClick={() => window.electronAPI.openExternal(getViewerUrl(office.url))}
+                      onClick={() => {
+                        const url = getViewerUrl(office.url);
+                        if (url) window.electronAPI.openExternal(url);
+                      }}
                       className="p-1.5 rounded-md text-foreground/30 hover:text-foreground hover:bg-accent/60 transition-all duration-150"
                     >
                       <ExternalLink size={12} strokeWidth={1.8} />

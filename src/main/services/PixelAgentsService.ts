@@ -30,7 +30,7 @@ export class PixelAgentsService {
     try {
       if (!existsSync(getConfigPath())) return null;
       const raw = JSON.parse(readFileSync(getConfigPath(), 'utf-8'));
-      // Return config with token presence indicators (not actual tokens)
+      const encryptedTokens = ConnectionConfigService.getAllPixelAgentsTokens();
       return {
         name: raw.name || '',
         palette: raw.palette,
@@ -39,8 +39,8 @@ export class PixelAgentsService {
           (o: { id: string; url: string; token?: string; enabled: boolean }) => ({
             id: o.id,
             url: o.url,
-            // Signal that a token exists without exposing it
-            token: o.token ? '••••••••' : null,
+            // Check encrypted storage for token presence (file may have been scrubbed)
+            token: encryptedTokens[o.id] ? '••••••••' : null,
             enabled: o.enabled,
           }),
         ),
@@ -184,6 +184,10 @@ export class PixelAgentsService {
 
     PixelAgentsService.officeStatuses = {};
     PixelAgentsService.emitStatus();
+
+    // Scrub plaintext tokens from config file (structure preserved for next launch)
+    PixelAgentsService.scrubConfigTokens();
+
     console.log('[pixel-agents] Stopped');
   }
 
@@ -226,6 +230,23 @@ export class PixelAgentsService {
     const sender = PixelAgentsService.sender;
     if (sender && !sender.isDestroyed()) {
       sender.send('pixelAgents:statusChanged', PixelAgentsService.getStatus());
+    }
+  }
+
+  /** Rewrite config file with all tokens set to null so no secrets remain on disk */
+  private static scrubConfigTokens(): void {
+    try {
+      if (!existsSync(getConfigPath())) return;
+      const raw = JSON.parse(readFileSync(getConfigPath(), 'utf-8'));
+      raw.offices = (raw.offices || []).map((o: { id: string; url: string; enabled: boolean }) => ({
+        id: o.id,
+        url: o.url,
+        token: null,
+        enabled: o.enabled,
+      }));
+      writeFileSync(getConfigPath(), JSON.stringify(raw, null, 2), { mode: 0o600 });
+    } catch {
+      // Best effort
     }
   }
 
