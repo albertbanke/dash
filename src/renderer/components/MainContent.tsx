@@ -71,6 +71,21 @@ export function MainContent({
           if (!cancelled && resp.success) pr = resp.data ?? null;
         }
 
+        // Also check Linear linked issues for PRs
+        if (!cancelled && !pr && activeTask.linkedItems) {
+          const linearItems = activeTask.linkedItems.filter((i) => i.provider === 'linear');
+          for (const item of linearItems) {
+            if (cancelled) break;
+            if (item.provider === 'linear') {
+              const resp = await window.electronAPI.linearGetPrForIssue(item.identifier);
+              if (!cancelled && resp.success && resp.data) {
+                pr = resp.data;
+                break;
+              }
+            }
+          }
+        }
+
         if (!cancelled) setPrInfo(pr);
       } catch {
         if (!cancelled) setPrInfo(null);

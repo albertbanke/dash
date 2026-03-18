@@ -9,6 +9,8 @@ import type {
   DiffResult,
   BranchInfo,
   GithubIssue,
+  LinearIssue,
+  LinearConfig,
   AzureDevOpsWorkItem,
   AzureDevOpsConfig,
   CommitGraphData,
@@ -199,6 +201,22 @@ export interface ElectronAPI {
     gitRemote: string,
     projectId?: string,
   ) => Promise<IpcResponse<PullRequestInfo | null>>;
+
+  // Linear
+  linearCheckConfigured: () => Promise<IpcResponse<boolean>>;
+  linearTestConnection: (apiKey: string) => Promise<IpcResponse<boolean>>;
+  linearSaveConfig: (apiKey: string, teamKey?: string) => Promise<IpcResponse<void>>;
+  linearGetConfig: () => Promise<IpcResponse<LinearConfig | null>>;
+  linearRemoveConfig: () => Promise<IpcResponse<void>>;
+  linearSearchIssues: (query: string) => Promise<IpcResponse<LinearIssue[]>>;
+  linearGetIssue: (identifier: string) => Promise<IpcResponse<LinearIssue>>;
+  linearPostBranchComment: (identifier: string, branch: string) => Promise<IpcResponse<void>>;
+  linearCreateAttachment: (
+    identifier: string,
+    branch: string,
+    repoUrl: string,
+  ) => Promise<IpcResponse<void>>;
+  linearGetPrForIssue: (identifier: string) => Promise<IpcResponse<PullRequestInfo | null>>;
 
   // Git detection
   detectGit: (

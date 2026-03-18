@@ -1,4 +1,4 @@
-import type { LinkedItem, LinkedGithubIssue, LinkedAdoWorkItem } from './types';
+import type { LinkedItem, LinkedGithubIssue, LinkedAdoWorkItem, LinkedLinearIssue } from './types';
 
 function truncate(s: string | undefined, max: number): string {
   if (!s) return '';
@@ -36,6 +36,14 @@ function formatAdoWorkItem(wi: LinkedAdoWorkItem): string {
     .join('\n');
 }
 
+function formatLinearIssue(issue: LinkedLinearIssue): string {
+  const state = issue.state ? `State: ${issue.state}\n` : '';
+  const labels =
+    issue.labels && issue.labels.length > 0 ? `Labels: ${issue.labels.join(', ')}\n` : '';
+  const desc = truncate(issue.description, 2000);
+  return `## Issue ${issue.identifier}: ${issue.title}\n${state}${labels}${desc}`;
+}
+
 /**
  * Build a task context prompt from linked items.
  * Returns null if there are no items to format.
@@ -43,6 +51,7 @@ function formatAdoWorkItem(wi: LinkedAdoWorkItem): string {
 export function formatTaskContextPrompt(linkedItems: LinkedItem[]): string | null {
   const ghItems = linkedItems.filter((i): i is LinkedGithubIssue => i.provider === 'github');
   const adoItems = linkedItems.filter((i): i is LinkedAdoWorkItem => i.provider === 'ado');
+  const linearItems = linkedItems.filter((i): i is LinkedLinearIssue => i.provider === 'linear');
 
   const blocks: string[] = [];
 
@@ -55,6 +64,12 @@ export function formatTaskContextPrompt(linkedItems: LinkedItem[]): string | nul
   if (adoItems.length > 0) {
     blocks.push(
       `I'm working on the following Azure DevOps work item(s):\n\n${adoItems.map(formatAdoWorkItem).join('\n\n---\n\n')}`,
+    );
+  }
+
+  if (linearItems.length > 0) {
+    blocks.push(
+      `I'm working on the following Linear issue(s):\n\n${linearItems.map(formatLinearIssue).join('\n\n---\n\n')}`,
     );
   }
 

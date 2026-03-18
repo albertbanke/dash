@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { AdoConnectionForm } from './AdoConnectionForm';
+import { LinearConnectionForm } from './LinearConnectionForm';
 import { isAdoRemote } from '../../shared/urls';
 import type { Project } from '../../shared/types';
 
@@ -103,6 +104,14 @@ export function ProjectSettingsModal({
               <AdoConnectionForm projectId={project.id} />
             </div>
           )}
+
+          {/* Linear connection — available for all projects */}
+          <div>
+            <label className="block text-[12px] font-medium text-muted-foreground/70 mb-2">
+              Linear
+            </label>
+            <LinearConnectionForm />
+          </div>
         </div>
       </div>
     </div>

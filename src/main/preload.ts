@@ -162,6 +162,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   adoGetPrForBranch: (branch: string, gitRemote: string, projectId?: string) =>
     ipcRenderer.invoke('ado:get-pr-for-branch', { branch, gitRemote, projectId }),
 
+  // Linear
+  linearCheckConfigured: () => ipcRenderer.invoke('linear:check-configured'),
+  linearTestConnection: (apiKey: string) =>
+    ipcRenderer.invoke('linear:test-connection', { apiKey }),
+  linearSaveConfig: (apiKey: string, teamKey?: string) =>
+    ipcRenderer.invoke('linear:save-config', { apiKey, teamKey }),
+  linearGetConfig: () => ipcRenderer.invoke('linear:get-config'),
+  linearRemoveConfig: () => ipcRenderer.invoke('linear:remove-config'),
+  linearSearchIssues: (query: string) => ipcRenderer.invoke('linear:search-issues', { query }),
+  linearGetIssue: (identifier: string) => ipcRenderer.invoke('linear:get-issue', { identifier }),
+  linearPostBranchComment: (identifier: string, branch: string) =>
+    ipcRenderer.invoke('linear:post-branch-comment', { identifier, branch }),
+  linearCreateAttachment: (identifier: string, branch: string, repoUrl: string) =>
+    ipcRenderer.invoke('linear:create-attachment', { identifier, branch, repoUrl }),
+  linearGetPrForIssue: (identifier: string) =>
+    ipcRenderer.invoke('linear:get-pr-for-issue', { identifier }),
+
   // Git detection
   detectGit: (folderPath: string) => ipcRenderer.invoke('app:detectGit', folderPath),
   detectClaude: () => ipcRenderer.invoke('app:detectClaude'),

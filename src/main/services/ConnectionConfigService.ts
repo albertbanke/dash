@@ -14,8 +14,14 @@ interface StoredPixelAgentsToken {
   encryptedToken: string;
 }
 
+interface StoredLinearEntry {
+  encryptedApiKey: string;
+  teamKey?: string;
+}
+
 interface StoredConfig {
   ado?: Record<string, StoredAdoEntry>; // keyed by projectId or 'default'
+  linear?: StoredLinearEntry;
   pixelAgentsTokens?: StoredPixelAgentsToken[];
 }
 
@@ -124,6 +130,42 @@ export class ConnectionConfigService {
     if (!config.ado) return false;
     if (projectId && config.ado[projectId]) return true;
     return config.ado[DEFAULT_KEY] != null;
+  }
+
+  // ── Linear Config Storage ──────────────────────────────────
+
+  static getLinearConfig(): { apiKey: string; teamKey?: string } | null {
+    const config = this.readConfig();
+    if (!config.linear) return null;
+
+    try {
+      return {
+        apiKey: this.decryptPat(config.linear.encryptedApiKey),
+        teamKey: config.linear.teamKey,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  static saveLinearConfig(apiKey: string, teamKey?: string): void {
+    const config = this.readConfig();
+    config.linear = {
+      encryptedApiKey: this.encryptPat(apiKey),
+      teamKey,
+    };
+    this.writeConfig(config);
+  }
+
+  static removeLinearConfig(): void {
+    const config = this.readConfig();
+    delete config.linear;
+    this.writeConfig(config);
+  }
+
+  static isLinearConfigured(): boolean {
+    const config = this.readConfig();
+    return config.linear != null;
   }
 
   // ── Pixel Agents Token Storage ──────────────────────────────

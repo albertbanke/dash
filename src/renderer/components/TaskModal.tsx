@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, GitBranch, Zap, ChevronDown, Loader2, AlertCircle, Search, Upload } from 'lucide-react';
 import { SearchableMultiSelect } from './SearchableMultiSelect';
-import type { BranchInfo, GithubIssue, AzureDevOpsWorkItem, LinkedItem } from '../../shared/types';
+import type {
+  BranchInfo,
+  GithubIssue,
+  AzureDevOpsWorkItem,
+  LinearIssue,
+  LinkedItem,
+} from '../../shared/types';
 import { isAdoRemote } from '../../shared/urls';
 
 export interface CreateTaskOptions {
@@ -73,6 +79,32 @@ function AdoWorkItemRow({ item }: { item: AzureDevOpsWorkItem }) {
   );
 }
 
+function LinearIssueRow({ issue }: { issue: LinearIssue }) {
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[11px] text-muted-foreground/50 font-mono shrink-0">
+          {issue.identifier}
+        </span>
+        <span className="text-[12px] text-foreground/80 truncate">{issue.title}</span>
+      </div>
+      <div className="flex gap-1 mt-0.5 flex-wrap">
+        <span className="px-1.5 py-0.5 rounded text-[9px] bg-accent/60 text-muted-foreground/60">
+          {issue.state}
+        </span>
+        {issue.labels.slice(0, 2).map((label) => (
+          <span
+            key={label}
+            className="px-1.5 py-0.5 rounded text-[9px] bg-accent/60 text-muted-foreground/60"
+          >
+            {label}
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function TaskModal({
   projectPath,
   projectId,
@@ -97,11 +129,14 @@ export function TaskModal({
   const isAdo = isAdoRemote(gitRemote);
   const [ghAvailable, setGhAvailable] = useState(false);
   const [adoAvailable, setAdoAvailable] = useState(false);
+  const [linearAvailable, setLinearAvailable] = useState(false);
   const [selectedIssues, setSelectedIssues] = useState<GithubIssue[]>([]);
   const [selectedWorkItems, setSelectedWorkItems] = useState<AzureDevOpsWorkItem[]>([]);
+  const [selectedLinearIssues, setSelectedLinearIssues] = useState<LinearIssue[]>([]);
 
   const showGithub = !isAdo && ghAvailable;
   const showAdo = isAdo && adoAvailable;
+  const showLinear = linearAvailable;
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -117,6 +152,10 @@ export function TaskModal({
         if (resp.success && resp.data) setGhAvailable(true);
       });
     }
+    // Linear is available alongside any git provider
+    window.electronAPI.linearCheckConfigured().then((resp) => {
+      if (resp.success && resp.data) setLinearAvailable(true);
+    });
   }, [isAdo, gitRemote, projectId]);
 
   // Fetch branches when worktree is enabled
@@ -149,6 +188,11 @@ export function TaskModal({
   const searchAdoWorkItems = useCallback(
     (query: string) => window.electronAPI.adoSearchWorkItems(query, projectId),
     [projectId],
+  );
+
+  const searchLinearIssues = useCallback(
+    (query: string) => window.electronAPI.linearSearchIssues(query),
+    [],
   );
 
   async function fetchBranches() {
@@ -201,7 +245,18 @@ export function TaskModal({
         acceptanceCriteria: wi.acceptanceCriteria,
         parents: wi.parents,
       }));
-      const allLinkedItems: LinkedItem[] = [...ghItems, ...adoItems];
+      const linearItems: LinkedItem[] = selectedLinearIssues.map((issue) => ({
+        provider: 'linear' as const,
+        id: issue.id,
+        identifier: issue.identifier,
+        title: issue.title,
+        url: issue.url,
+        state: issue.state,
+        priority: issue.priority,
+        labels: issue.labels.length > 0 ? issue.labels : undefined,
+        description: issue.description,
+      }));
+      const allLinkedItems: LinkedItem[] = [...ghItems, ...adoItems, ...linearItems];
 
       onCreate({
         name: name.trim(),
@@ -391,16 +446,12 @@ export function TaskModal({
           )}
 
           {/* Issue/Work Item pickers */}
-          {(showGithub || showAdo) && (
+          {(showGithub || showAdo || showLinear) && (
             <div className="mb-4">
               <label className="block text-[12px] font-medium text-muted-foreground/70 mb-2">
                 <span className="flex items-center gap-1.5">
                   <Search size={12} strokeWidth={1.8} />
-                  {showGithub && showAdo
-                    ? 'Link issues / work items'
-                    : showAdo
-                      ? 'Link work items'
-                      : 'Link issues'}
+                  Link issues
                   <span className="text-muted-foreground/40 font-normal">optional</span>
                 </span>
               </label>
@@ -426,6 +477,18 @@ export function TaskModal({
                   getLabel={(i) => `#${i.id}`}
                   renderItem={(item) => <AdoWorkItemRow item={item} />}
                   placeholder="Search work items..."
+                />
+              )}
+
+              {showLinear && (
+                <SearchableMultiSelect<LinearIssue>
+                  onSearch={searchLinearIssues}
+                  selected={selectedLinearIssues}
+                  onSelect={setSelectedLinearIssues}
+                  getKey={(i) => i.id}
+                  getLabel={(i) => i.identifier}
+                  renderItem={(issue) => <LinearIssueRow issue={issue} />}
+                  placeholder="Search Linear issues..."
                 />
               )}
             </div>

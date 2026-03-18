@@ -275,13 +275,18 @@ export function ProjectOverview({
                       {linkedItems.length > 0 &&
                         (() => {
                           const isAdo = linkedItems.some((i) => i.provider === 'ado');
-                          const label = isAdo
+                          const isLinear = linkedItems.some((i) => i.provider === 'linear');
+                          const label = isLinear
                             ? linkedItems.length === 1
-                              ? 'Work item:'
-                              : 'Work items:'
-                            : linkedItems.length === 1
                               ? 'Issue:'
-                              : 'Issues:';
+                              : 'Issues:'
+                            : isAdo
+                              ? linkedItems.length === 1
+                                ? 'Work item:'
+                                : 'Work items:'
+                              : linkedItems.length === 1
+                                ? 'Issue:'
+                                : 'Issues:';
                           return (
                             <div className="flex items-start gap-1.5 text-muted-foreground">
                               <span className="flex-shrink-0 text-muted-foreground/70 mt-0.5">
@@ -290,9 +295,11 @@ export function ProjectOverview({
                               <div className="flex flex-wrap gap-1.5">
                                 {linkedItems.map((item) => {
                                   const url = linkedItemUrl(item, project.gitRemote);
+                                  const displayId =
+                                    item.provider === 'linear' ? item.identifier : `#${item.id}`;
                                   const badge = (
                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-[10px] text-primary font-medium">
-                                      #{item.id}
+                                      {displayId}
                                     </span>
                                   );
                                   const link = url ? (
