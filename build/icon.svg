@@ -1,7 +1,61 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Background rounded square -->
-  <rect width="512" height="512" rx="108" fill="#0a0a0a"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5b6cf7"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
 
-  <!-- Green dash -->
-  <rect x="136" y="230" width="240" height="52" rx="26" fill="#00ff88"/>
+  <!-- Background rounded square -->
+  <rect width="1024" height="1024" rx="228" fill="url(#bg)"/>
+
+  <!-- Subtle grid pattern -->
+  <g opacity="0.04" stroke="#ffffff" stroke-width="1">
+    <line x1="256" y1="0" x2="256" y2="1024"/>
+    <line x1="512" y1="0" x2="512" y2="1024"/>
+    <line x1="768" y1="0" x2="768" y2="1024"/>
+    <line x1="0" y1="256" x2="1024" y2="256"/>
+    <line x1="0" y1="512" x2="1024" y2="512"/>
+    <line x1="0" y1="768" x2="1024" y2="768"/>
+  </g>
+
+  <!-- Graph edges (connections) -->
+  <g stroke="url(#accent)" stroke-width="5" opacity="0.35" stroke-linecap="round">
+    <line x1="512" y1="420" x2="340" y2="310"/>
+    <line x1="512" y1="420" x2="700" y2="330"/>
+    <line x1="512" y1="420" x2="320" y2="540"/>
+    <line x1="512" y1="420" x2="710" y2="520"/>
+    <line x1="512" y1="420" x2="400" y2="620"/>
+    <line x1="512" y1="420" x2="640" y2="640"/>
+    <line x1="340" y1="310" x2="320" y2="540"/>
+    <line x1="700" y1="330" x2="710" y2="520"/>
+    <line x1="400" y1="620" x2="640" y2="640"/>
+    <line x1="340" y1="310" x2="700" y2="330"/>
+  </g>
+
+  <!-- Graph nodes (outer) -->
+  <circle cx="340" cy="310" r="18" fill="url(#accent)" opacity="0.6"/>
+  <circle cx="700" cy="330" r="18" fill="url(#accent)" opacity="0.6"/>
+  <circle cx="320" cy="540" r="14" fill="url(#accent)" opacity="0.5"/>
+  <circle cx="710" cy="520" r="14" fill="url(#accent)" opacity="0.5"/>
+  <circle cx="400" cy="620" r="12" fill="url(#accent)" opacity="0.4"/>
+  <circle cx="640" cy="640" r="12" fill="url(#accent)" opacity="0.4"/>
+
+  <!-- Central node (larger, brighter) -->
+  <circle cx="512" cy="420" r="32" fill="url(#glow)" opacity="0.15"/>
+  <circle cx="512" cy="420" r="22" fill="url(#glow)" opacity="0.8"/>
+
+  <!-- "SG" text -->
+  <text x="512" y="810" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif" font-size="160" font-weight="700" letter-spacing="-4" fill="url(#glow)">SG</text>
+
+  <!-- Subtle underline accent -->
+  <rect x="390" y="830" width="244" height="4" rx="2" fill="url(#accent)" opacity="0.5"/>
 </svg>
