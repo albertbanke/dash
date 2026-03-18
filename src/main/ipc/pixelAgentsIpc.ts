@@ -13,12 +13,21 @@ export function registerPixelAgentsIpc(): void {
 
   ipcMain.handle('pixelAgents:saveConfig', (_event, config: PixelAgentsConfig) => {
     try {
+      const prev = PixelAgentsService.readConfig();
       PixelAgentsService.saveConfig(config);
+
       const hasEnabled = config.name && config.offices.some((o) => o.enabled);
-      if (hasEnabled) {
-        PixelAgentsService.restart();
-      } else {
+      // Only restart when connection-relevant fields change (name, offices).
+      // Phrases are picked up by the watcher's config hot-reload.
+      const needsRestart =
+        !prev ||
+        prev.name !== config.name ||
+        JSON.stringify(prev.offices) !== JSON.stringify(config.offices);
+
+      if (!hasEnabled) {
         PixelAgentsService.stop();
+      } else if (needsRestart) {
+        PixelAgentsService.restart();
       }
       return { success: true };
     } catch (error) {

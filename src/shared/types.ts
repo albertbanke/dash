@@ -292,6 +292,7 @@ export interface PixelAgentsConfig {
   name: string;
   palette?: number;
   hueShift?: number;
+  phrases?: string[];
   offices: PixelAgentsOffice[];
 }
 

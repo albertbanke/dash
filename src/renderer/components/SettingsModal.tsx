@@ -174,14 +174,20 @@ function PixelAgentsSection({
   const [addingOffice, setAddingOffice] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [localName, setLocalName] = useState(config?.name || '');
+  const [localPhrases, setLocalPhrases] = useState(config?.phrases?.join(', ') || '');
+  const [phrasesDirty, setPhrasesDirty] = useState(false);
   const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const effectiveConfig = config || { name: '', offices: [] };
 
-  // Sync localName when config changes externally
+  // Sync local state when config changes externally
   useEffect(() => {
     setLocalName(config?.name || '');
   }, [config?.name]);
+
+  useEffect(() => {
+    setLocalPhrases(config?.phrases?.join(', ') || '');
+  }, [config?.phrases]);
 
   function updateConfig(partial: Partial<PixelAgentsConfig>) {
     onChange({ ...effectiveConfig, ...partial });
@@ -259,6 +265,43 @@ function PixelAgentsSection({
           placeholder="e.g. Alice"
           className="w-full px-3 py-2.5 rounded-lg text-[12px] border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
         />
+      </div>
+
+      {/* Phrases */}
+      <div className="mb-3">
+        <label className="flex items-center gap-1.5 text-[11px] text-foreground/60 mb-1.5">
+          Speech Bubble Phrases
+          {phrasesDirty && <span className="inline-block w-1.5 h-1.5 rounded-full bg-yellow-400" />}
+        </label>
+        <input
+          type="text"
+          value={localPhrases}
+          onChange={(e) => {
+            setLocalPhrases(e.target.value);
+            setPhrasesDirty(true);
+          }}
+          onBlur={() => {
+            if (!phrasesDirty) return;
+            const parsed = localPhrases
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .map((s) => (s.length > 50 ? s.slice(0, 50) : s));
+            updateConfig({ phrases: parsed });
+            setPhrasesDirty(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          placeholder="e.g. lgtm, shipping it!, need coffee"
+          className="w-full px-3 py-2.5 rounded-lg text-[12px] border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+        />
+        <p className="text-[10px] text-foreground/40 mt-1">
+          Comma-separated. Your agents will randomly say these in speech bubbles. Max 50 characters
+          each.
+        </p>
       </div>
 
       {/* Offices list */}
