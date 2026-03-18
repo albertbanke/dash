@@ -11,7 +11,7 @@ export interface Project {
   updatedAt: string;
 }
 
-export type IssueProvider = 'github' | 'ado';
+export type IssueProvider = 'github' | 'ado' | 'linear';
 
 export interface LinkedGithubIssue {
   provider: 'github';
@@ -35,7 +35,19 @@ export interface LinkedAdoWorkItem {
   parents?: AzureDevOpsWorkItemRef[];
 }
 
-export type LinkedItem = LinkedGithubIssue | LinkedAdoWorkItem;
+export interface LinkedLinearIssue {
+  provider: 'linear';
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+  state?: string;
+  priority?: number;
+  labels?: string[];
+  description?: string;
+}
+
+export type LinkedItem = LinkedGithubIssue | LinkedAdoWorkItem | LinkedLinearIssue;
 
 export interface Task {
   id: string;
@@ -96,6 +108,22 @@ export interface RemoveWorktreeOptions {
   deleteWorktreeDir?: boolean;
   deleteLocalBranch?: boolean;
   deleteRemoteBranch?: boolean;
+}
+
+export interface TaskContextMetaItem {
+  id: number;
+  url: string;
+}
+
+export interface TaskContextMetaLinearItem {
+  identifier: string;
+  url: string;
+}
+
+export interface TaskContextMeta {
+  githubIssues?: TaskContextMetaItem[];
+  adoWorkItems?: TaskContextMetaItem[];
+  linearIssues?: TaskContextMetaLinearItem[];
 }
 
 export interface PtyOptions {
@@ -302,6 +330,25 @@ export interface GithubIssue {
   assignees?: string[];
 }
 
+// ── Linear Types ───────────────────────────────────────────
+
+export interface LinearIssue {
+  id: string;
+  identifier: string;
+  title: string;
+  url: string;
+  state: string;
+  priority: number;
+  assignee?: string;
+  labels: string[];
+  description?: string;
+}
+
+export interface LinearConfig {
+  apiKey: string;
+  teamKey?: string;
+}
+
 // ── Azure DevOps Types ─────────────────────────────────────
 
 export interface AzureDevOpsWorkItemRef {
@@ -340,7 +387,7 @@ export interface PullRequestInfo {
   title: string;
   url: string;
   state: PullRequestState;
-  provider: 'github' | 'ado';
+  provider: 'github' | 'ado' | 'linear';
 }
 
 // ── Remote Control Types ────────────────────────────────────

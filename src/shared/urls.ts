@@ -100,10 +100,10 @@ export function isAdoRemote(remote: string | null): boolean {
 
 /** Get the display URL for a linked item */
 export function linkedItemUrl(
-  item: { provider: 'github' | 'ado'; id: number; url: string },
+  item: { provider: string; id: number | string; url: string },
   remote: string | null,
 ): string | null {
   if (item.url) return item.url;
-  if (item.provider === 'github' && remote) return githubIssueUrl(remote, item.id);
+  if (item.provider === 'github' && remote) return githubIssueUrl(remote, item.id as number);
   return null;
 }
