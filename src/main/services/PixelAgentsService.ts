@@ -126,9 +126,20 @@ export class PixelAgentsService {
     PixelAgentsService.running = true;
     PixelAgentsService.officeStatuses = {};
 
-    const child = spawn(binPath, ['--config', getConfigPath()], {
+    // In packaged builds, the watcher lives in app.asar.unpacked and can't be
+    // executed directly. Use Electron as a plain Node process via ELECTRON_RUN_AS_NODE.
+    const args = app.isPackaged
+      ? [binPath, '--config', getConfigPath()]
+      : ['--config', getConfigPath()];
+    const cmd = app.isPackaged ? process.execPath : binPath;
+
+    const child = spawn(cmd, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, NODE_NO_WARNINGS: '1' },
+      env: {
+        ...process.env,
+        NODE_NO_WARNINGS: '1',
+        ...(app.isPackaged ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+      },
     });
 
     PixelAgentsService.child = child;
@@ -272,13 +283,14 @@ export class PixelAgentsService {
   }
 
   private static resolveBinPath(): string | null {
-    // In dev: node_modules/.bin/pixel-agents-watcher
+    // In dev: node_modules/.bin/pixel-agents-watcher (shell wrapper)
     const devPath = join(app.getAppPath(), 'node_modules', '.bin', 'pixel-agents-watcher');
     if (existsSync(devPath)) return devPath;
 
-    // Packaged app: try resolving the module entry directly
+    // Packaged app: resolve the bundled CJS file from asarUnpack
     try {
-      return require.resolve('@syv-ai/pixel-agents-watcher/watcher.js');
+      const resolved = require.resolve('@syv-ai/pixel-agents-watcher/dist/watcher.cjs');
+      return resolved.replace('app.asar', 'app.asar.unpacked');
     } catch {
       return null;
     }

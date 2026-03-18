@@ -1,6 +1,6 @@
 {
   "name": "dash",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Dash — Desktop app for Claude Code with git worktree management",
   "main": "dist/main/main/entry.js",
   "author": "mhenrichsen",
@@ -30,7 +30,8 @@
     ],
     "asarUnpack": [
       "node_modules/better-sqlite3/**",
-      "node_modules/node-pty/**"
+      "node_modules/node-pty/**",
+      "node_modules/@syv-ai/pixel-agents-watcher/**"
     ],
     "npmRebuild": false,
     "publish": {
@@ -84,7 +85,7 @@
     ]
   },
   "dependencies": {
-    "@syv-ai/pixel-agents-watcher": "^1.1.0",
+    "@syv-ai/pixel-agents-watcher": "^1.2.0",
     "@types/qrcode": "^1.5.6",
     "better-sqlite3": "^11.7.0",
     "drizzle-orm": "^0.32.0",
