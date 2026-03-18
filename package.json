@@ -3,7 +3,7 @@
   "version": "0.7.0",
   "description": "Dash — Desktop app for Claude Code with git worktree management",
   "main": "dist/main/main/entry.js",
-  "author": "mhenrichsen",
+  "author": "mhenrichsen <mads@syv.ai>, nthomsencph <nicolai@syv.ai>, FabianScott <fabian@syv.ai>",
   "license": "MIT",
   "scripts": {
     "dev": "concurrently -n main,renderer -c blue,green \"pnpm dev:main\" \"pnpm dev:renderer\"",
