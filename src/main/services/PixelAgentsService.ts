@@ -35,6 +35,7 @@ export class PixelAgentsService {
         name: raw.name || '',
         palette: raw.palette,
         hueShift: raw.hueShift,
+        phrases: raw.phrases || [],
         offices: (raw.offices || []).map(
           (o: { id: string; url: string; token?: string; enabled: boolean }) => ({
             id: o.id,
@@ -95,6 +96,7 @@ export class PixelAgentsService {
           name: config.name,
           palette: config.palette ?? 0,
           hueShift: config.hueShift ?? 0,
+          phrases: config.phrases || [],
           offices: config.offices.map((o) => ({
             id: o.id,
             url: o.url,
