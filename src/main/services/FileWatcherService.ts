@@ -8,7 +8,7 @@ const DEBOUNCE_MS = 500;
 const GIT_WATCH_FILES = ['index', 'HEAD', 'MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD'];
 
 interface WatcherEntry {
-  watchers: fs.FSWatcher[];
+  watcher: fs.FSWatcher;
   debounceTimer: ReturnType<typeof setTimeout> | null;
   cwd: string;
 }
@@ -23,11 +23,14 @@ export function startWatching(id: string, cwd: string): void {
   if (entries.has(id)) return;
 
   const gitDir = path.join(cwd, '.git');
-  const fsWatchers: fs.FSWatcher[] = [];
-  const entry: WatcherEntry = { watchers: fsWatchers, debounceTimer: null, cwd };
-  entries.set(id, entry);
 
-  const debouncedNotify = () => {
+  // Watch the .git directory itself (non-recursively) instead of individual files.
+  // Git updates files atomically (write tmp → rename), which breaks per-file watchers
+  // on macOS since the watcher follows the old inode. Watching the directory works on
+  // both platforms and automatically picks up files created later (e.g. MERGE_HEAD).
+  const watcher = fs.watch(gitDir, (_eventType, filename) => {
+    if (!filename || !GIT_WATCH_FILES.includes(filename)) return;
+
     if (entry.debounceTimer) {
       clearTimeout(entry.debounceTimer);
     }
@@ -35,18 +38,12 @@ export function startWatching(id: string, cwd: string): void {
       notifyRenderers(id);
       entry.debounceTimer = null;
     }, DEBOUNCE_MS);
-  };
+  });
 
-  for (const file of GIT_WATCH_FILES) {
-    const filePath = path.join(gitDir, file);
-    try {
-      const watcher = fs.watch(filePath, debouncedNotify);
-      watcher.on('error', () => {}); // File may not exist (e.g. MERGE_HEAD)
-      fsWatchers.push(watcher);
-    } catch {
-      // File doesn't exist yet — that's fine
-    }
-  }
+  watcher.on('error', () => {}); // .git dir may vanish (e.g. repo deleted)
+
+  const entry: WatcherEntry = { watcher, debounceTimer: null, cwd };
+  entries.set(id, entry);
 }
 
 /**
@@ -60,12 +57,10 @@ export function stopWatching(id: string): void {
     clearTimeout(entry.debounceTimer);
   }
 
-  for (const w of entry.watchers) {
-    try {
-      w.close();
-    } catch {
-      // Already closed
-    }
+  try {
+    entry.watcher.close();
+  } catch {
+    // Already closed
   }
 
   entries.delete(id);
