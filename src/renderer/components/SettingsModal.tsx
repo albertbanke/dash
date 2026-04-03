@@ -45,6 +45,8 @@ interface SettingsModalProps {
   onNotificationSoundChange: (value: NotificationSound) => void;
   desktopNotification: boolean;
   onDesktopNotificationChange: (value: boolean) => void;
+  showActiveTasksSection: boolean;
+  onShowActiveTasksSectionChange: (value: boolean) => void;
   shellDrawerEnabled: boolean;
   onShellDrawerEnabledChange: (value: boolean) => void;
   shellDrawerPosition: 'left' | 'main' | 'right';
@@ -738,6 +740,8 @@ export function SettingsModal({
   onNotificationSoundChange,
   desktopNotification,
   onDesktopNotificationChange,
+  showActiveTasksSection,
+  onShowActiveTasksSectionChange,
   shellDrawerEnabled,
   onShellDrawerEnabledChange,
   shellDrawerPosition,
@@ -1004,6 +1008,37 @@ export function SettingsModal({
                 </p>
               </div>
 
+              {/* Active Tasks Section */}
+              <div>
+                <label className="block text-[12px] font-medium text-foreground mb-3">
+                  Active Tasks
+                </label>
+                <button
+                  onClick={() => onShowActiveTasksSectionChange(!showActiveTasksSection)}
+                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-[13px] border transition-all duration-150 ${
+                    showActiveTasksSection
+                      ? 'border-primary/40 bg-primary/8 text-foreground ring-1 ring-primary/20'
+                      : 'border-border/60 text-foreground/60 hover:bg-accent/40 hover:text-foreground'
+                  }`}
+                >
+                  <div
+                    className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 flex-shrink-0 ${
+                      showActiveTasksSection ? 'bg-primary' : 'bg-border'
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
+                        showActiveTasksSection ? 'translate-x-[16px]' : 'translate-x-[2px]'
+                      }`}
+                    />
+                  </div>
+                  Show active tasks in sidebar
+                </button>
+                <p className="text-[10px] text-foreground/80 mt-2">
+                  Quick-switch between running tasks with Ctrl+Tab.
+                </p>
+              </div>
+
               {/* Shell Terminal */}
               <div>
                 <label className="block text-[12px] font-medium text-foreground mb-3">
@@ -1148,54 +1183,6 @@ export function SettingsModal({
                   Controls attribution appended to git commits by Claude. Default uses the Dash
                   attribution. Clear the field to disable attribution.
                 </p>
-              </div>
-
-              {/* Claude CLI */}
-              <div>
-                <label className="block text-[12px] font-medium text-foreground mb-3">
-                  Claude Code CLI
-                </label>
-                <div
-                  className="flex items-start gap-3.5 p-4 rounded-xl border border-border/40"
-                  style={{ background: 'hsl(var(--surface-2))' }}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      claudeInfo?.installed
-                        ? 'bg-[hsl(var(--git-added)/0.12)]'
-                        : 'bg-[hsl(var(--git-modified)/0.12)]'
-                    }`}
-                  >
-                    {claudeInfo?.installed ? (
-                      <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={1.8} />
-                    ) : (
-                      <AlertCircle
-                        size={14}
-                        className="text-[hsl(var(--git-modified))]"
-                        strokeWidth={2}
-                      />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    {claudeInfo?.installed ? (
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] text-foreground/60 font-mono">
-                          {claudeInfo.version}
-                        </p>
-                        <p className="text-[11px] text-foreground/40 font-mono truncate">
-                          {claudeInfo.path}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-foreground/60 leading-relaxed">
-                        Not found. Install with{' '}
-                        <code className="px-1.5 py-0.5 rounded bg-accent/80 text-[10px] font-mono text-foreground/70">
-                          npm install -g @anthropic-ai/claude-code
-                        </code>
-                      </p>
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* Updates */}
@@ -1493,6 +1480,44 @@ export function SettingsModal({
                   </div>
                 </div>
               ))}
+
+              {/* Fixed shortcuts (not rebindable) */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/60">
+                    Active Tasks
+                  </span>
+                  <div className="flex-1 h-px bg-border/30" />
+                </div>
+                <div
+                  className="rounded-xl border border-border/40 overflow-hidden"
+                  style={{ background: 'hsl(var(--surface-2))' }}
+                >
+                  {[
+                    { label: 'Next Active Task', keys: ['Ctrl', '⇥'] },
+                    { label: 'Previous Active Task', keys: ['Ctrl', '⇧', '⇥'] },
+                  ].map(({ label, keys }, i) => (
+                    <div
+                      key={label}
+                      className={`flex items-center justify-between px-4 py-2.5 ${
+                        i === 0 ? 'border-b border-border/20' : ''
+                      }`}
+                    >
+                      <span className="text-[13px] text-foreground/80">{label}</span>
+                      <div className="flex items-center gap-[3px]">
+                        {keys.map((k) => (
+                          <kbd
+                            key={k}
+                            className="min-w-[22px] h-[22px] flex items-center justify-center rounded-md bg-accent/60 text-[11px] text-foreground/70 font-mono px-1.5"
+                          >
+                            {k}
+                          </kbd>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
