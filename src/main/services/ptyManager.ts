@@ -6,9 +6,43 @@ import { promisify } from 'util';
 import { type WebContents, app } from 'electron';
 import { activityMonitor } from './ActivityMonitor';
 import { hookServer } from './HookServer';
-import type { TaskContextMeta } from '@shared/types';
+import { DatabaseService } from './DatabaseService';
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Locate the Claude projects directory for a given cwd.
+ * Claude stores sessions under ~/.claude/projects/<encoded-cwd>/.
+ */
+function findClaudeProjectDir(cwd: string): string | null {
+  try {
+    const projectsDir = path.join(os.homedir(), '.claude', 'projects');
+    if (!fs.existsSync(projectsDir)) return null;
+
+    // Path-based: slashes → hyphens (the primary naming scheme)
+    const pathBased = path.join(projectsDir, cwd.replace(/\//g, '-'));
+    if (fs.existsSync(pathBased)) return pathBased;
+
+    // Partial match: last 3 path segments
+    const parts = cwd.split('/').filter((p) => p.length > 0);
+    const suffix = parts.slice(-3).join('-');
+    const dirs = fs.readdirSync(projectsDir);
+    const match = dirs.find((d) => d.includes(suffix));
+    if (match) return path.join(projectsDir, match);
+
+    return null;
+  } catch (err) {
+    console.error('[findClaudeProjectDir] Failed to scan projects dir:', err);
+    return null;
+  }
+}
+
+/** Check whether Claude has a session file for the given UUID in this cwd. */
+function hasSessionForId(cwd: string, sessionId: string): boolean {
+  const projDir = findClaudeProjectDir(cwd);
+  if (!projDir) return false;
+  return fs.existsSync(path.join(projDir, `${sessionId}.jsonl`));
+}
 
 interface PtyRecord {
   proc: any; // IPty from node-pty
@@ -34,6 +68,16 @@ let claudeEnvVars: Record<string, string> = {};
 
 // When true, inherit the full parent process.env as a base instead of the minimal set.
 let syncShellEnv = false;
+
+const RESERVED_ENV_KEYS = new Set([
+  'PATH',
+  'HOME',
+  'USER',
+  'TERM',
+  'COLORTERM',
+  'TERM_PROGRAM',
+  'COLORFGBG',
+]);
 
 export function setCommitAttribution(value: string | undefined): void {
   commitAttributionSetting = value;
@@ -174,15 +218,6 @@ function buildDirectEnv(isDark: boolean): Record<string, string> {
 
   // Merge user-configured Claude Code env vars (curated toggles + custom vars from settings),
   // but prevent overriding internal keys that would break spawned processes.
-  const RESERVED_ENV_KEYS = new Set([
-    'PATH',
-    'HOME',
-    'USER',
-    'TERM',
-    'COLORTERM',
-    'TERM_PROGRAM',
-    'COLORFGBG',
-  ]);
   for (const [key, value] of Object.entries(claudeEnvVars)) {
     if (!RESERVED_ENV_KEYS.has(key)) {
       env[key] = value;
@@ -195,31 +230,14 @@ function buildDirectEnv(isDark: boolean): Record<string, string> {
   return env;
 }
 
-/**
- * Write .claude/task-context.json with issue context for the SessionStart hook.
- * Called from IPC during task creation, before Claude spawns.
- */
-export function writeTaskContext(cwd: string, prompt: string, meta?: TaskContextMeta): void {
-  const claudeDir = path.join(cwd, '.claude');
-  const contextPath = path.join(claudeDir, 'task-context.json');
-
-  const payload: Record<string, unknown> = {
-    hookSpecificOutput: {
-      hookEventName: 'SessionStart',
-      additionalContext: prompt,
-    },
-  };
-  if (meta) {
-    payload.meta = meta;
-  }
-
+/** Retrieve stored task context prompt from the database. */
+function getTaskContextPrompt(taskId: string): string | null {
   try {
-    if (!fs.existsSync(claudeDir)) {
-      fs.mkdirSync(claudeDir, { recursive: true });
-    }
-    fs.writeFileSync(contextPath, JSON.stringify(payload, null, 2) + '\n');
+    const task = DatabaseService.getTask(taskId);
+    return task?.contextPrompt ?? null;
   } catch (err) {
-    console.error('[writeTaskContext] Failed:', err);
+    console.error('[getTaskContextPrompt] Failed to read context for task', taskId, err);
+    return null;
   }
 }
 
@@ -272,32 +290,37 @@ function writeHookSettings(cwd: string, ptyId: string): void {
         ],
       },
     ],
-    Notification: [
-      {
-        matcher: 'permission_prompt',
-        hooks: [postHook('/hook/notification')],
-      },
-      {
-        matcher: 'idle_prompt',
-        hooks: [postHook('/hook/notification')],
-      },
-    ],
+    Notification: ['permission_prompt', 'idle_prompt'].map((matcher) => ({
+      matcher,
+      hooks: [postHook('/hook/notification')],
+    })),
   };
 
-  // Auto-detect task-context.json and inject SessionStart hook if it exists
-  const contextPath = path.join(claudeDir, 'task-context.json');
-  if (fs.existsSync(contextPath)) {
-    hookSettings.SessionStart = [
-      {
-        matcher: 'startup',
-        hooks: [
-          {
-            type: 'command',
-            command: `cat "${contextPath}"`,
-          },
-        ],
+  // Inject task context via SessionStart hook. Fires on startup (new session),
+  // and re-injects after compact/clear so Claude retains issue awareness.
+  const contextPrompt = getTaskContextPrompt(ptyId);
+  if (contextPrompt) {
+    const hookPayload = JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: contextPrompt,
       },
-    ];
+    });
+    // Use base64 encoding to safely embed user-controlled content in a shell command.
+    // Single-quote escaping is fragile with content from GitHub issues / ADO work items.
+    const b64 = Buffer.from(hookPayload).toString('base64');
+    const sessionStartHook = {
+      hooks: [
+        {
+          type: 'command',
+          command: `echo '${b64}' | base64 -d`,
+        },
+      ],
+    };
+    hookSettings.SessionStart = ['startup', 'compact', 'clear'].map((matcher) => ({
+      matcher,
+      ...sessionStartHook,
+    }));
   }
 
   try {
@@ -310,8 +333,13 @@ function writeHookSettings(cwd: string, ptyId: string): void {
     if (fs.existsSync(settingsPath)) {
       try {
         existing = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-      } catch {
-        // Corrupted — overwrite
+      } catch (err) {
+        console.error(
+          '[writeHookSettings] Corrupted settings.local.json at',
+          settingsPath,
+          '— overwriting:',
+          err,
+        );
       }
     }
 
@@ -398,8 +426,6 @@ export async function startDirectPty(options: {
 }): Promise<{
   reattached: boolean;
   isDirectSpawn: boolean;
-  hasTaskContext: boolean;
-  taskContextMeta: TaskContextMeta | null;
 }> {
   // Re-attach to existing PTY (e.g., after renderer reload)
   const existing = ptys.get(options.id);
@@ -413,7 +439,7 @@ export async function startDirectPty(options: {
     ptys.delete(options.id);
   } else if (existing) {
     existing.owner = options.sender || null;
-    return { reattached: true, isDirectSpawn: true, hasTaskContext: false, taskContextMeta: null };
+    return { reattached: true, isDirectSpawn: true };
   }
 
   const claudePath = await findClaudePath();
@@ -423,9 +449,20 @@ export async function startDirectPty(options: {
   }
 
   const args: string[] = [];
-  if (options.resume) {
+
+  // Pin each task to its own Claude session so tasks sharing the same cwd
+  // (e.g. multiple tasks in the main worktree) never resume each other.
+  if (options.resume && hasSessionForId(options.cwd, options.id)) {
+    // Session was created with --session-id; resume it by ID.
+    args.push('-r', options.id);
+  } else if (options.resume) {
+    // Legacy task created before session pinning — fall back to most recent.
     args.push('-c', '-r');
+  } else {
+    // New session: create with deterministic UUID tied to this task.
+    args.push('--session-id', options.id);
   }
+
   if (options.autoApprove) {
     args.push('--dangerously-skip-permissions');
   }
@@ -476,21 +513,9 @@ export async function startDirectPty(options: {
     ptys.delete(options.id);
   });
 
-  const contextPath = path.join(options.cwd, '.claude', 'task-context.json');
-  let taskContextMeta: TaskContextMeta | null = null;
-  try {
-    if (fs.existsSync(contextPath)) {
-      const parsed = JSON.parse(fs.readFileSync(contextPath, 'utf-8'));
-      taskContextMeta = parsed.meta ?? null;
-    }
-  } catch {
-    // Best effort
-  }
   return {
     reattached: false,
     isDirectSpawn: true,
-    hasTaskContext: !!taskContextMeta,
-    taskContextMeta,
   };
 }
 
@@ -743,12 +768,14 @@ export function killAll(): void {
 export function killByOwner(owner: WebContents): void {
   for (const [id, record] of ptys) {
     if (record.owner === owner) {
+      ptys.delete(id);
+      activityMonitor.unregister(id);
+      remoteControlService.unregister(id);
       try {
         record.proc.kill();
       } catch {
-        activityMonitor.unregister(id);
+        // Already dead
       }
-      ptys.delete(id);
     }
   }
 }
