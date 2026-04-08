@@ -85,8 +85,20 @@
           ]
         }
       ],
-      "icon": "build/icon.ico",
+      "icon": "build/win/icon.ico",
       "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/win/icon.ico",
+      "uninstallerIcon": "build/win/icon.ico",
+      "installerHeaderIcon": "build/win/icon.ico",
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "include": "build/win/installer.nsh",
+      "installerSidebar": "build/win/installerSidebar.bmp",
+      "uninstallerSidebar": "build/win/installerSidebar.bmp"
     }
   },
   "pnpm": {
