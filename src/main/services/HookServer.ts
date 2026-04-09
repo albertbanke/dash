@@ -128,7 +128,7 @@ class HookServerImpl {
     if (this.server) return this._port;
 
     return new Promise((resolve, reject) => {
-      this.server = http.createServer((req, res) => {
+      this.server = http.createServer(async (req, res) => {
         const url = new URL(req.url || '', `http://127.0.0.1:${this._port}`);
         const ptyId = url.searchParams.get('ptyId');
 

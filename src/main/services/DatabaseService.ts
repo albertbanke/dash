@@ -120,6 +120,20 @@ export class DatabaseService {
     return this.mapTask(rows[0]);
   }
 
+  static getTask(id: string): Task | undefined {
+    const db = getDb();
+    const row = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    return row ? this.mapTask(row) : undefined;
+  }
+
+  static setTaskContextPrompt(id: string, prompt: string): void {
+    const db = getDb();
+    db.update(tasks)
+      .set({ contextPrompt: prompt, updatedAt: new Date().toISOString() })
+      .where(eq(tasks.id, id))
+      .run();
+  }
+
   static deleteTask(id: string): void {
     const db = getDb();
     db.delete(tasks).where(eq(tasks.id, id)).run();
@@ -216,6 +230,7 @@ export class DatabaseService {
       autoApprove: row.autoApprove ?? false,
       branchCreatedByDash: row.branchCreatedByDash ?? false,
       linkedItems,
+      contextPrompt: row.contextPrompt ?? null,
       archivedAt: row.archivedAt,
       createdAt: row.createdAt ?? '',
       updatedAt: row.updatedAt ?? '',

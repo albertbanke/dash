@@ -115,7 +115,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ptyHasClaudeSession: (cwd: string) => ipcRenderer.invoke('pty:hasClaudeSession', cwd),
 
   // Task context for SessionStart hook
-  ptyWriteTaskContext: (args: { cwd: string; prompt: string; meta?: unknown }) =>
+  ptyWriteTaskContext: (args: { taskId: string; prompt: string }) =>
     ipcRenderer.invoke('pty:writeTaskContext', args),
 
   // App lifecycle
@@ -146,6 +146,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('app:setDesktopNotification', opts),
   setCommitAttribution: (value: string | undefined) =>
     ipcRenderer.send('app:setCommitAttribution', value),
+  setClaudeEnvVars: (vars: Record<string, string>) =>
+    ipcRenderer.send('app:setClaudeEnvVars', vars),
+  setSyncShellEnv: (enabled: boolean) => ipcRenderer.send('app:setSyncShellEnv', enabled),
   getClaudeAttribution: (projectPath?: string) =>
     ipcRenderer.invoke('app:getClaudeAttribution', projectPath),
 

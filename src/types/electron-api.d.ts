@@ -15,7 +15,6 @@ import type {
   CommitDetail,
   StatusLineData,
   RemoteControlState,
-  TaskContextMeta,
   PullRequestInfo,
   PixelAgentsConfig,
   PixelAgentsStatus,
@@ -104,8 +103,6 @@ export interface ElectronAPI {
     IpcResponse<{
       reattached: boolean;
       isDirectSpawn: boolean;
-      hasTaskContext: boolean;
-      taskContextMeta: TaskContextMeta | null;
     }>
   >;
   ptyStart: (args: {
@@ -147,11 +144,7 @@ export interface ElectronAPI {
   ptyHasClaudeSession: (cwd: string) => Promise<IpcResponse<boolean>>;
 
   // Task context for SessionStart hook
-  ptyWriteTaskContext: (args: {
-    cwd: string;
-    prompt: string;
-    meta?: TaskContextMeta;
-  }) => Promise<IpcResponse<void>>;
+  ptyWriteTaskContext: (args: { taskId: string; prompt: string }) => Promise<IpcResponse<void>>;
 
   // App lifecycle
   onBeforeQuit: (callback: () => void) => () => void;
@@ -161,6 +154,8 @@ export interface ElectronAPI {
   // Settings
   setDesktopNotification: (opts: { enabled: boolean }) => void;
   setCommitAttribution: (value: string | undefined) => void;
+  setClaudeEnvVars: (vars: Record<string, string>) => void;
+  setSyncShellEnv: (enabled: boolean) => void;
   getClaudeAttribution: (projectPath?: string) => Promise<IpcResponse<string | null>>;
 
   // GitHub

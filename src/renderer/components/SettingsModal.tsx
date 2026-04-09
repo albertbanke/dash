@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { Tooltip } from './ui/Tooltip';
+import { ToggleSwitch } from './ui/ToggleSwitch';
 import type { KeyBindingMap, KeyBinding } from '../keybindings';
 import {
   getBindingKeys,
@@ -38,7 +39,13 @@ import { UsageBar } from './ui/UsageBar';
 const DASH_DEFAULT_ATTRIBUTION =
   '\n\nCo-Authored-By: Claude <noreply@anthropic.com> via Dash <dash@syv.ai>';
 
-type SettingsTab = 'general' | 'appearance' | 'keybindings' | 'usage' | 'pixel-agents';
+type SettingsTab =
+  | 'general'
+  | 'appearance'
+  | 'claude-code'
+  | 'keybindings'
+  | 'usage'
+  | 'pixel-agents';
 
 interface SettingsModalProps {
   initialTab?: string;
@@ -50,6 +57,8 @@ interface SettingsModalProps {
   onNotificationSoundChange: (value: NotificationSound) => void;
   desktopNotification: boolean;
   onDesktopNotificationChange: (value: boolean) => void;
+  showActiveTasksSection: boolean;
+  onShowActiveTasksSectionChange: (value: boolean) => void;
   shellDrawerEnabled: boolean;
   onShellDrawerEnabledChange: (value: boolean) => void;
   shellDrawerPosition: 'left' | 'main' | 'right';
@@ -60,6 +69,12 @@ interface SettingsModalProps {
   onPreferredIDEChange: (value: 'cursor' | 'code' | 'auto') => void;
   commitAttribution: string | undefined;
   onCommitAttributionChange: (value: string | undefined) => void;
+  effortLevel: string;
+  onEffortLevelChange: (value: string) => void;
+  syncShellEnv: boolean;
+  onSyncShellEnvChange: (value: boolean) => void;
+  customClaudeEnvVars: Record<string, string>;
+  onCustomClaudeEnvVarsChange: (value: Record<string, string>) => void;
   activeProjectPath?: string;
   keybindings: KeyBindingMap;
   onKeybindingsChange: (bindings: KeyBindingMap) => void;
@@ -714,6 +729,201 @@ function UsageSection({
   );
 }
 
+function ClaudeCodeTab({
+  effortLevel,
+  onEffortLevelChange,
+  syncShellEnv,
+  onSyncShellEnvChange,
+  customEnvVars,
+  onCustomEnvVarsChange,
+  claudeInfo,
+}: {
+  effortLevel: string;
+  onEffortLevelChange: (v: string) => void;
+  syncShellEnv: boolean;
+  onSyncShellEnvChange: (v: boolean) => void;
+  customEnvVars: Record<string, string>;
+  onCustomEnvVarsChange: (v: Record<string, string>) => void;
+  claudeInfo: { installed: boolean; version: string | null; path: string | null } | null;
+}) {
+  const [newKey, setNewKey] = useState('');
+  const [newValue, setNewValue] = useState('');
+
+  const entries = Object.entries(customEnvVars);
+
+  function addEntry() {
+    const key = newKey.trim();
+    if (!key || !/^[A-Z_][A-Z0-9_]*$/.test(key)) return;
+    onCustomEnvVarsChange({ ...customEnvVars, [key]: newValue });
+    setNewKey('');
+    setNewValue('');
+  }
+
+  function removeEntry(key: string) {
+    const next = { ...customEnvVars };
+    delete next[key];
+    onCustomEnvVarsChange(next);
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* CLI Info */}
+      <div
+        className="flex items-start gap-3.5 p-4 rounded-xl border border-border/40"
+        style={{ background: 'hsl(var(--surface-2))' }}
+      >
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            claudeInfo?.installed
+              ? 'bg-[hsl(var(--git-added)/0.12)]'
+              : 'bg-[hsl(var(--git-modified)/0.12)]'
+          }`}
+        >
+          {claudeInfo?.installed ? (
+            <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={1.8} />
+          ) : (
+            <AlertCircle size={14} className="text-[hsl(var(--git-modified))]" strokeWidth={1.8} />
+          )}
+        </div>
+        <div className="min-w-0">
+          {claudeInfo?.installed ? (
+            <div className="space-y-0.5">
+              <p className="text-[11px] text-foreground/60 font-mono">{claudeInfo.version}</p>
+              <p className="text-[11px] text-foreground/40 font-mono truncate">{claudeInfo.path}</p>
+            </div>
+          ) : (
+            <p className="text-[11px] text-foreground/60 leading-relaxed">
+              Not found. Install with{' '}
+              <code className="px-1.5 py-0.5 rounded bg-accent/80 text-[10px] font-mono text-foreground/70">
+                npm install -g @anthropic-ai/claude-code
+              </code>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Inherit Shell Environment */}
+      <div>
+        <label className="block text-[12px] font-medium text-foreground mb-3">
+          Shell Environment
+        </label>
+        <ToggleSwitch
+          enabled={syncShellEnv}
+          onToggle={onSyncShellEnvChange}
+          label="Inherit environment from Dash process"
+        />
+        <p className="text-[10px] text-foreground/80 mt-2">
+          {syncShellEnv
+            ? 'Claude Code inherits all environment variables from the Dash process. Variables below override inherited values.'
+            : 'Dash uses a minimal, isolated environment. Only variables configured below are passed to Claude Code.'}
+        </p>
+      </div>
+
+      {/* Effort Level */}
+      <div>
+        <label className="block text-[12px] font-medium text-foreground mb-3">Effort Level</label>
+        <div className="grid grid-cols-4 gap-2">
+          {(
+            [
+              { value: 'auto', label: 'Auto' },
+              { value: 'low', label: 'Low' },
+              { value: 'medium', label: 'Medium' },
+              { value: 'high', label: 'High' },
+            ] as const
+          ).map(({ value, label }) => {
+            const isActive = effortLevel === value;
+            return (
+              <button
+                key={value}
+                onClick={() => onEffortLevelChange(value)}
+                className={`px-3 py-2.5 rounded-lg text-[12px] border transition-all duration-150 ${
+                  isActive
+                    ? 'border-primary/40 bg-primary/8 text-foreground ring-1 ring-primary/20 font-medium'
+                    : 'border-border/60 text-foreground/60 hover:bg-accent/40 hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-foreground/80 mt-2">
+          Controls how much effort Claude spends reasoning. Auto lets the model decide.
+        </p>
+      </div>
+
+      {/* Custom Environment Variables */}
+      <div>
+        <label className="block text-[12px] font-medium text-foreground mb-3">
+          Custom Environment Variables
+        </label>
+        <div className="space-y-2">
+          {entries.map(([key, value]) => (
+            <div key={key} className="flex items-center gap-2">
+              <span className="flex-1 min-w-0 px-3 py-2 rounded-lg text-[12px] font-mono border border-border/40 bg-transparent text-foreground/80 truncate">
+                {key}
+              </span>
+              <span className="text-foreground/30 text-[12px]">=</span>
+              <span className="flex-1 min-w-0 px-3 py-2 rounded-lg text-[12px] font-mono border border-border/40 bg-transparent text-foreground/80 truncate">
+                {value}
+              </span>
+              <button
+                onClick={() => removeEntry(key)}
+                className="p-1.5 rounded-lg hover:bg-destructive/10 text-foreground/40 hover:text-destructive transition-all duration-150 flex-shrink-0"
+              >
+                <Trash2 size={14} strokeWidth={1.8} />
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newKey}
+              onChange={(e) => setNewKey(e.target.value.toUpperCase())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addEntry();
+              }}
+              placeholder="VARIABLE_NAME"
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg text-[12px] font-mono border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+            />
+            <span className="text-foreground/30 text-[12px]">=</span>
+            <input
+              type="text"
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addEntry();
+              }}
+              placeholder="value"
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg text-[12px] font-mono border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40"
+            />
+            <button
+              onClick={addEntry}
+              disabled={!newKey.trim()}
+              className="p-1.5 rounded-lg hover:bg-primary/10 text-foreground/40 hover:text-primary transition-all duration-150 flex-shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Plus size={14} strokeWidth={1.8} />
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] text-foreground/80 mt-2">
+          Additional environment variables passed to Claude Code processes. Takes effect on new
+          tasks.{' '}
+          <a
+            href="https://code.claude.com/docs/en/env-vars"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-0.5 text-primary hover:underline"
+          >
+            Browse all variables
+            <ExternalLink size={9} strokeWidth={1.8} />
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsModal({
   initialTab,
   theme,
@@ -724,6 +934,8 @@ export function SettingsModal({
   onNotificationSoundChange,
   desktopNotification,
   onDesktopNotificationChange,
+  showActiveTasksSection,
+  onShowActiveTasksSectionChange,
   shellDrawerEnabled,
   onShellDrawerEnabledChange,
   shellDrawerPosition,
@@ -734,6 +946,12 @@ export function SettingsModal({
   onPreferredIDEChange,
   commitAttribution,
   onCommitAttributionChange,
+  effortLevel,
+  onEffortLevelChange,
+  syncShellEnv,
+  onSyncShellEnvChange,
+  customClaudeEnvVars,
+  onCustomClaudeEnvVarsChange,
   activeProjectPath,
   keybindings,
   onKeybindingsChange,
@@ -750,6 +968,7 @@ export function SettingsModal({
   const validTabs: SettingsTab[] = [
     'general',
     'appearance',
+    'claude-code',
     'keybindings',
     'usage',
     'pixel-agents',
@@ -867,6 +1086,7 @@ export function SettingsModal({
               { id: 'general', label: 'General' },
               { id: 'appearance', label: 'Appearance' },
               { id: 'keybindings', label: 'Keybindings' },
+              { id: 'claude-code', label: 'Claude' },
               { id: 'usage', label: 'Usage' },
               { id: 'pixel-agents', label: 'Pixel Agents' },
             ] as const
@@ -963,29 +1183,28 @@ export function SettingsModal({
                 <label className="block text-[12px] font-medium text-foreground mb-3">
                   Desktop Notifications
                 </label>
-                <button
-                  onClick={() => onDesktopNotificationChange(!desktopNotification)}
-                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-[13px] border transition-all duration-150 ${
-                    desktopNotification
-                      ? 'border-primary/40 bg-primary/8 text-foreground ring-1 ring-primary/20'
-                      : 'border-border/60 text-foreground/60 hover:bg-accent/40 hover:text-foreground'
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 flex-shrink-0 ${
-                      desktopNotification ? 'bg-primary' : 'bg-border'
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
-                        desktopNotification ? 'translate-x-[16px]' : 'translate-x-[2px]'
-                      }`}
-                    />
-                  </div>
-                  Show desktop notification when a task finishes
-                </button>
+                <ToggleSwitch
+                  enabled={desktopNotification}
+                  onToggle={onDesktopNotificationChange}
+                  label="Show desktop notification when a task finishes"
+                />
                 <p className="text-[10px] text-foreground/80 mt-2">
                   Notification will include the task name
+                </p>
+              </div>
+
+              {/* Active Tasks Section */}
+              <div>
+                <label className="block text-[12px] font-medium text-foreground mb-3">
+                  Active Tasks
+                </label>
+                <ToggleSwitch
+                  enabled={showActiveTasksSection}
+                  onToggle={onShowActiveTasksSectionChange}
+                  label="Show active tasks in sidebar"
+                />
+                <p className="text-[10px] text-foreground/80 mt-2">
+                  Quick-switch between running tasks with Ctrl+Tab.
                 </p>
               </div>
 
@@ -994,27 +1213,11 @@ export function SettingsModal({
                 <label className="block text-[12px] font-medium text-foreground mb-3">
                   Shell Terminal
                 </label>
-                <button
-                  onClick={() => onShellDrawerEnabledChange(!shellDrawerEnabled)}
-                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg text-[13px] border transition-all duration-150 ${
-                    shellDrawerEnabled
-                      ? 'border-primary/40 bg-primary/8 text-foreground ring-1 ring-primary/20'
-                      : 'border-border/60 text-foreground/60 hover:bg-accent/40 hover:text-foreground'
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 flex-shrink-0 ${
-                      shellDrawerEnabled ? 'bg-primary' : 'bg-border'
-                    }`}
-                  >
-                    <div
-                      className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
-                        shellDrawerEnabled ? 'translate-x-[16px]' : 'translate-x-[2px]'
-                      }`}
-                    />
-                  </div>
-                  Show shell terminal drawer
-                </button>
+                <ToggleSwitch
+                  enabled={shellDrawerEnabled}
+                  onToggle={onShellDrawerEnabledChange}
+                  label="Show shell terminal drawer"
+                />
                 {shellDrawerEnabled && (
                   <div className="grid grid-cols-3 gap-2 mt-3">
                     {[
@@ -1133,54 +1336,6 @@ export function SettingsModal({
                   Controls attribution appended to git commits by Claude. Default uses the Dash
                   attribution. Clear the field to disable attribution.
                 </p>
-              </div>
-
-              {/* Claude CLI */}
-              <div>
-                <label className="block text-[12px] font-medium text-foreground mb-3">
-                  Claude Code CLI
-                </label>
-                <div
-                  className="flex items-start gap-3.5 p-4 rounded-xl border border-border/40"
-                  style={{ background: 'hsl(var(--surface-2))' }}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      claudeInfo?.installed
-                        ? 'bg-[hsl(var(--git-added)/0.12)]'
-                        : 'bg-[hsl(var(--git-modified)/0.12)]'
-                    }`}
-                  >
-                    {claudeInfo?.installed ? (
-                      <Check size={14} className="text-[hsl(var(--git-added))]" strokeWidth={2.5} />
-                    ) : (
-                      <AlertCircle
-                        size={14}
-                        className="text-[hsl(var(--git-modified))]"
-                        strokeWidth={2}
-                      />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    {claudeInfo?.installed ? (
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] text-foreground/60 font-mono">
-                          {claudeInfo.version}
-                        </p>
-                        <p className="text-[11px] text-foreground/40 font-mono truncate">
-                          {claudeInfo.path}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-foreground/60 leading-relaxed">
-                        Not found. Install with{' '}
-                        <code className="px-1.5 py-0.5 rounded bg-accent/80 text-[10px] font-mono text-foreground/70">
-                          npm install -g @anthropic-ai/claude-code
-                        </code>
-                      </p>
-                    )}
-                  </div>
-                </div>
               </div>
 
               {/* Updates */}
@@ -1387,6 +1542,18 @@ export function SettingsModal({
             </div>
           )}
 
+          {tab === 'claude-code' && (
+            <ClaudeCodeTab
+              effortLevel={effortLevel}
+              onEffortLevelChange={onEffortLevelChange}
+              syncShellEnv={syncShellEnv}
+              onSyncShellEnvChange={onSyncShellEnvChange}
+              customEnvVars={customClaudeEnvVars}
+              onCustomEnvVarsChange={onCustomClaudeEnvVarsChange}
+              claudeInfo={claudeInfo}
+            />
+          )}
+
           {tab === 'pixel-agents' && (
             <div className="space-y-6 animate-fade-in">
               <PixelAgentsSection
@@ -1476,6 +1643,44 @@ export function SettingsModal({
                   </div>
                 </div>
               ))}
+
+              {/* Fixed shortcuts (not rebindable) */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/60">
+                    Active Tasks
+                  </span>
+                  <div className="flex-1 h-px bg-border/30" />
+                </div>
+                <div
+                  className="rounded-xl border border-border/40 overflow-hidden"
+                  style={{ background: 'hsl(var(--surface-2))' }}
+                >
+                  {[
+                    { label: 'Next Active Task', keys: ['Ctrl', '⇥'] },
+                    { label: 'Previous Active Task', keys: ['Ctrl', '⇧', '⇥'] },
+                  ].map(({ label, keys }, i) => (
+                    <div
+                      key={label}
+                      className={`flex items-center justify-between px-4 py-2.5 ${
+                        i === 0 ? 'border-b border-border/20' : ''
+                      }`}
+                    >
+                      <span className="text-[13px] text-foreground/80">{label}</span>
+                      <div className="flex items-center gap-[3px]">
+                        {keys.map((k) => (
+                          <kbd
+                            key={k}
+                            className="min-w-[22px] h-[22px] flex items-center justify-center rounded-md bg-accent/60 text-[11px] text-foreground/70 font-mono px-1.5"
+                          >
+                            {k}
+                          </kbd>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>

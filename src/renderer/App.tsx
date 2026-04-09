@@ -111,6 +111,21 @@ export function App() {
     if (stored === null) return undefined; // "default" — key absent
     return stored; // '' for "none", or custom text
   });
+  const [effortLevel, setEffortLevel] = useState<string>(() => {
+    return localStorage.getItem('claudeEffortLevel') || 'auto';
+  });
+  const [syncShellEnv, setSyncShellEnv] = useState(() => {
+    return localStorage.getItem('syncShellEnv') === 'true';
+  });
+  const [customClaudeEnvVars, setCustomClaudeEnvVars] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('customClaudeEnvVars') || '{}');
+    } catch (err) {
+      console.error('Failed to parse customClaudeEnvVars from localStorage, resetting:', err);
+      localStorage.removeItem('customClaudeEnvVars');
+      return {};
+    }
+  });
   // Pixel Agents state
   const [pixelAgentsConfig, setPixelAgentsConfig] = useState<PixelAgentsConfig | null>(null);
   const [pixelAgentsStatus, setPixelAgentsStatus] = useState<PixelAgentsStatus>({
@@ -141,6 +156,16 @@ export function App() {
   useEffect(() => {
     window.electronAPI.setCommitAttribution?.(commitAttribution);
   }, [commitAttribution]);
+  // Sync shell env inheritance to main process
+  useEffect(() => {
+    window.electronAPI.setSyncShellEnv?.(syncShellEnv);
+  }, [syncShellEnv]);
+  // Sync Claude Code env vars to main process
+  useEffect(() => {
+    const vars: Record<string, string> = { ...customClaudeEnvVars };
+    if (effortLevel !== 'auto') vars.CLAUDE_CODE_EFFORT_LEVEL = effortLevel;
+    window.electronAPI.setClaudeEnvVars?.(vars);
+  }, [effortLevel, customClaudeEnvVars]);
 
   // Activity state — keys are PTY IDs that have active sessions
   const [taskActivity, setTaskActivity] = useState<Record<string, ActivityInfo>>({});
@@ -209,6 +234,27 @@ export function App() {
     });
   }, [activeTaskId]);
 
+  // Rotation — tasks the user cycles through with Ctrl+Tab
+  const [showActiveTasksSection, setShowActiveTasksSection] = useState(
+    () => localStorage.getItem('showActiveTasksSection') !== 'false',
+  );
+  useEffect(() => {
+    localStorage.setItem('showActiveTasksSection', String(showActiveTasksSection));
+  }, [showActiveTasksSection]);
+
+  const [rotationExclusions, setRotationExclusions] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('rotationExclusions');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('rotationExclusions', JSON.stringify([...rotationExclusions]));
+  }, [rotationExclusions]);
+
   // Git state
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const [gitLoading, setGitLoading] = useState(false);
@@ -247,6 +293,23 @@ export function App() {
   const activeProjectTasks = activeProjectId
     ? (tasksByProject[activeProjectId] || []).filter((t) => !t.archivedAt)
     : [];
+
+  // Rotation: all tasks with activity, minus exclusions
+  const rotationTasks = React.useMemo(() => {
+    const tasks: Task[] = [];
+    for (const projectTasks of Object.values(tasksByProject)) {
+      for (const task of projectTasks) {
+        if (
+          !task.archivedAt &&
+          taskActivity[task.id] !== undefined &&
+          !rotationExclusions.has(task.id)
+        ) {
+          tasks.push(task);
+        }
+      }
+    }
+    return tasks;
+  }, [tasksByProject, taskActivity, rotationExclusions]);
 
   // Load projects on mount
   useEffect(() => {
@@ -480,9 +543,47 @@ export function App() {
     };
   }, [activeTask?.id, activeTask?.path]);
 
+  const cycleTask = useCallback(
+    (direction: 1 | -1) => {
+      if (activeProjectTasks.length === 0) return;
+      const currentIdx = activeProjectTasks.findIndex((t) => t.id === activeTaskId);
+      const nextIdx =
+        (currentIdx + direction + activeProjectTasks.length) % activeProjectTasks.length;
+      setActiveTaskId(activeProjectTasks[nextIdx].id);
+    },
+    [activeProjectTasks, activeTaskId],
+  );
+
+  const cycleRotation = useCallback(
+    (direction: 1 | -1) => {
+      if (rotationTasks.length === 0) return;
+      const currentIdx = rotationTasks.findIndex((t) => t.id === activeTaskId);
+      const nextIdx = (currentIdx + direction + rotationTasks.length) % rotationTasks.length;
+      const nextTask = rotationTasks[nextIdx];
+      setActiveProjectId(nextTask.projectId);
+      setActiveTaskId(nextTask.id);
+    },
+    [rotationTasks, activeTaskId],
+  );
+
+  const removeFromRotation = useCallback((taskId: string) => {
+    setRotationExclusions((prev) => {
+      const next = new Set(prev);
+      next.add(taskId);
+      return next;
+    });
+  }, []);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Ctrl+Tab / Ctrl+Shift+Tab — cycle rotation (works even when terminal is focused)
+      if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Tab') {
+        e.preventDefault();
+        cycleRotation(e.shiftKey ? -1 : 1);
+        return;
+      }
+
       // Skip global shortcuts when typing in text inputs
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -602,18 +703,9 @@ export function App() {
     showTaskModal,
     showAddProjectModal,
     keybindings,
+    cycleTask,
+    cycleRotation,
   ]);
-
-  const cycleTask = useCallback(
-    (direction: 1 | -1) => {
-      if (activeProjectTasks.length === 0) return;
-      const currentIdx = activeProjectTasks.findIndex((t) => t.id === activeTaskId);
-      const nextIdx =
-        (currentIdx + direction + activeProjectTasks.length) % activeProjectTasks.length;
-      setActiveTaskId(activeProjectTasks[nextIdx].id);
-    },
-    [activeProjectTasks, activeTaskId],
-  );
 
   const toggleSidebar = useCallback(() => {
     const panel = sidebarPanelRef.current;
@@ -835,6 +927,12 @@ export function App() {
   function handleSelectTask(projectId: string, taskId: string) {
     setActiveProjectId(projectId);
     setActiveTaskId(taskId);
+    setRotationExclusions((prev) => {
+      if (!prev.has(taskId)) return prev;
+      const next = new Set(prev);
+      next.delete(taskId);
+      return next;
+    });
   }
 
   function handleNewTask(projectId: string) {
@@ -904,22 +1002,38 @@ export function App() {
       if (saveResp.success && saveResp.data) {
         const taskId = saveResp.data.id;
 
-        // Write task context for SessionStart hook injection
+        // Store task context so the SessionStart hook can inject it
         if (linkedItems && linkedItems.length > 0) {
           const prompt = formatTaskContextPrompt(linkedItems);
           if (prompt) {
-            window.electronAPI.ptyWriteTaskContext({
-              cwd: taskPath,
+            await window.electronAPI.ptyWriteTaskContext({
+              taskId,
               prompt,
-              meta: {
-                githubIssues:
-                  ghItems.length > 0 ? ghItems.map((i) => ({ id: i.id, url: i.url })) : undefined,
-                adoWorkItems:
-                  adoItems.length > 0
-                    ? adoItems.map((wi) => ({ id: wi.id, url: wi.url }))
-                    : undefined,
-              },
             });
+
+            // Notify the user that linked context will be injected
+            const maxVisible = 3;
+            const visible = linkedItems.slice(0, maxVisible);
+            const overflow = linkedItems.length - maxVisible;
+            toast(
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Context injected</span>
+                {visible.map((item) => (
+                  <a
+                    key={`${item.provider}-${item.id}`}
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium hover:bg-primary/20 transition-colors"
+                  >
+                    #{item.id}
+                  </a>
+                ))}
+                {overflow > 0 && (
+                  <span className="text-[10px] text-muted-foreground">+{overflow} more</span>
+                )}
+              </div>,
+            );
           }
         }
 
@@ -990,9 +1104,14 @@ export function App() {
         }
       }
 
-      // Clean up shell terminal sessions (first tab + any extra tabs)
+      // Clean up all terminal sessions: Claude main session + shell tabs
+      sessionRegistry.dispose(task.id);
       sessionRegistry.dispose(`shell:${task.id}`);
       sessionRegistry.disposeByPrefix(`shell:${task.id}:`);
+
+      // Kill PTY and clear snapshot so a new task in the same cwd starts fresh
+      window.electronAPI.ptyKill(task.id);
+      window.electronAPI.ptyClearSnapshot(task.id);
 
       await window.electronAPI.deleteTask(task.id);
       if (activeTaskId === task.id) {
@@ -1201,6 +1320,10 @@ export function App() {
                   (s) => s === 'connected' || s === 'registered',
                 ).length
               }
+              rotationTasks={rotationTasks}
+              onRemoveFromRotation={removeFromRotation}
+              showActiveTasksSection={showActiveTasksSection}
+              onToggleActiveTasksSection={() => setShowActiveTasksSection((v) => !v)}
             />
           </ShellDrawerWrapper>
         </Panel>
@@ -1423,6 +1546,8 @@ export function App() {
             localStorage.setItem('theme', t);
             sessionRegistry.setAllTerminalThemes(terminalTheme, t === 'dark');
           }}
+          showActiveTasksSection={showActiveTasksSection}
+          onShowActiveTasksSectionChange={setShowActiveTasksSection}
           shellDrawerEnabled={shellDrawerEnabled}
           onShellDrawerEnabledChange={(v) => {
             setShellDrawerEnabled(v);
@@ -1473,6 +1598,25 @@ export function App() {
             } else {
               localStorage.setItem('commitAttribution', v);
             }
+          }}
+          effortLevel={effortLevel}
+          onEffortLevelChange={(v) => {
+            setEffortLevel(v);
+            if (v === 'auto') {
+              localStorage.removeItem('claudeEffortLevel');
+            } else {
+              localStorage.setItem('claudeEffortLevel', v);
+            }
+          }}
+          syncShellEnv={syncShellEnv}
+          onSyncShellEnvChange={(v) => {
+            setSyncShellEnv(v);
+            localStorage.setItem('syncShellEnv', String(v));
+          }}
+          customClaudeEnvVars={customClaudeEnvVars}
+          onCustomClaudeEnvVarsChange={(v) => {
+            setCustomClaudeEnvVars(v);
+            localStorage.setItem('customClaudeEnvVars', JSON.stringify(v));
           }}
           keybindings={keybindings}
           onKeybindingsChange={(b) => {

@@ -107,20 +107,27 @@ export function registerAppIpc(): void {
   });
 
   ipcMain.on('app:setDesktopNotification', async (_event, opts: { enabled: boolean }) => {
-    const { setDesktopNotification } = await import('../services/ptyManager');
-    setDesktopNotification(opts);
+    try {
+      const { setDesktopNotification } = await import('../services/ptyManager');
+      setDesktopNotification(opts);
 
-    // Fire a test notification when newly enabled so macOS prompts for permission
-    if (opts.enabled) {
-      try {
-        const n = new Notification({
-          title: 'Dash',
-          body: 'Notifications enabled!',
-        });
-        n.show();
-      } catch {
-        // Ignore — user may have denied permission
+      // Fire a test notification when newly enabled so macOS prompts for permission
+      if (opts.enabled) {
+        try {
+          const n = new Notification({
+            title: 'Dash',
+            body: 'Notifications enabled!',
+          });
+          n.show();
+        } catch (err) {
+          console.error(
+            '[app:setDesktopNotification] Test notification failed (permission denied?):',
+            err,
+          );
+        }
       }
+    } catch (err) {
+      console.error('[app:setDesktopNotification] Failed:', err);
     }
   });
 
@@ -151,15 +158,38 @@ export function registerAppIpc(): void {
 
         // No custom attribution configured — Claude uses its built-in default
         return { success: true, data: null };
-      } catch {
+      } catch (err) {
+        console.error('[app:getClaudeAttribution] Failed to read settings:', err);
         return { success: true, data: null };
       }
     },
   );
 
   ipcMain.on('app:setCommitAttribution', async (_event, value: string | undefined) => {
-    const { setCommitAttribution } = await import('../services/ptyManager');
-    setCommitAttribution(value);
+    try {
+      const { setCommitAttribution } = await import('../services/ptyManager');
+      setCommitAttribution(value);
+    } catch (err) {
+      console.error('[app:setCommitAttribution] Failed:', err);
+    }
+  });
+
+  ipcMain.on('app:setClaudeEnvVars', async (_event, vars: Record<string, string>) => {
+    try {
+      const { setClaudeEnvVars } = await import('../services/ptyManager');
+      setClaudeEnvVars(vars);
+    } catch (err) {
+      console.error('[app:setClaudeEnvVars] Failed:', err);
+    }
+  });
+
+  ipcMain.on('app:setSyncShellEnv', async (_event, enabled: boolean) => {
+    try {
+      const { setSyncShellEnv } = await import('../services/ptyManager');
+      setSyncShellEnv(enabled);
+    } catch (err) {
+      console.error('[app:setSyncShellEnv] Failed:', err);
+    }
   });
 
   ipcMain.handle('app:detectClaude', async () => {
@@ -168,8 +198,10 @@ export function registerAppIpc(): void {
       const { claudeCliCache } = await import('../main');
       return { success: true, data: claudeCliCache };
     } catch (error) {
+      console.error('[app:detectClaude] Failed to import main module:', error);
       return {
-        success: true,
+        success: false,
+        error: String(error),
         data: { installed: false, version: null, path: null },
       };
     }

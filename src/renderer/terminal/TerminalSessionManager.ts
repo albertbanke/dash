@@ -34,15 +34,11 @@ export class TerminalSessionManager {
   private onReadyCallback: (() => void) | null = null;
   private readyFired = false;
   private readyFallbackTimer: ReturnType<typeof setTimeout> | null = null;
-  private onScrollStateChangeCallback: ((isAtBottom: boolean) => void) | null = null;
-  private lastEmittedAtBottom = true;
-  private wheelHandler: ((e: WheelEvent) => void) | null = null;
   private _currentCwd: string;
   private onCwdChangeCallback: ((cwd: string) => void) | null = null;
   private fitDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private lastPtyCols = 0;
   private lastPtyRows = 0;
-  private writeScrollRafPending = false;
   private savedViewportY: number | null = null;
   readonly shellOnly: boolean;
   private themeId: string;
@@ -162,6 +158,11 @@ export class TerminalSessionManager {
         return false;
       }
 
+      // Ctrl+Tab — let it bubble to window for rotation cycling
+      if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Tab') {
+        return false;
+      }
+
       // Shift+Enter → Ctrl+J (multiline input for Claude Code)
       if (e.key === 'Enter' && e.shiftKey) {
         e.preventDefault();
@@ -193,26 +194,6 @@ export class TerminalSessionManager {
     this.terminal.onData((data) => {
       window.electronAPI.ptyInput({ id: this.id, data });
     });
-
-    // Track scroll position to notify UI when user scrolls away from bottom
-    this.terminal.onScroll(() => this.emitScrollState());
-    // Batch write-driven scroll checks to once per frame to avoid
-    // excessive React re-renders during heavy terminal output
-    this.terminal.onWriteParsed(() => {
-      if (!this.writeScrollRafPending) {
-        this.writeScrollRafPending = true;
-        requestAnimationFrame(() => {
-          this.writeScrollRafPending = false;
-          this.emitScrollState();
-        });
-      }
-    });
-
-    // Wheel events on the xterm viewport may not trigger onScroll when terminal
-    // lacks focus. Listen directly and recheck after the browser processes the event.
-    this.wheelHandler = () => {
-      requestAnimationFrame(() => this.emitScrollState());
-    };
   }
 
   private async loadGpuAddon() {
@@ -267,11 +248,6 @@ export class TerminalSessionManager {
       if (xtermEl && xtermEl.parentElement !== container) {
         container.appendChild(xtermEl);
       }
-    }
-
-    // Wheel listener for scroll detection even without terminal focus
-    if (this.wheelHandler) {
-      container.addEventListener('wheel', this.wheelHandler, { passive: true });
     }
 
     // Resize observer
@@ -396,32 +372,6 @@ export class TerminalSessionManager {
             // Best effort
           }
         }
-
-        // Show info line when context was injected via SessionStart hook
-        if (result.taskContextMeta && !result.reattached && !resume) {
-          const { githubIssues, adoWorkItems } = result.taskContextMeta;
-
-          if (githubIssues && githubIssues.length > 0) {
-            const issueLabels = githubIssues.map((issue) => {
-              // OSC 8 hyperlink: \x1b]8;;URL\x07TEXT\x1b]8;;\x07
-              return issue.url
-                ? `\x1b]8;;${issue.url}\x07#${issue.id}\x1b]8;;\x07`
-                : `#${issue.id}`;
-            });
-            this.terminal.write(
-              `\x1b[2m\x1b[36m● Issue context injected: ${issueLabels.join(', ')}\x1b[0m\r\n`,
-            );
-          }
-
-          if (adoWorkItems && adoWorkItems.length > 0) {
-            const wiLabels = adoWorkItems.map((wi) => {
-              return wi.url ? `\x1b]8;;${wi.url}\x07#${wi.id}\x1b]8;;\x07` : `#${wi.id}`;
-            });
-            this.terminal.write(
-              `\x1b[2m\x1b[36m● Work item context injected: ${wiLabels.join(', ')}\x1b[0m\r\n`,
-            );
-          }
-        }
       }
     }
 
@@ -507,15 +457,9 @@ export class TerminalSessionManager {
       this.fitDebounceTimer = null;
     }
 
-    // Remove wheel listener
-    if (this.currentContainer && this.wheelHandler) {
-      this.currentContainer.removeEventListener('wheel', this.wheelHandler);
-    }
-
     // Clear callbacks to prevent stale setState on unmounted components
     this.onRestartingCallback = null;
     this.onReadyCallback = null;
-    this.onScrollStateChangeCallback = null;
     this.onCwdChangeCallback = null;
     this._isRestarting = false;
 
@@ -586,15 +530,6 @@ export class TerminalSessionManager {
 
   onCwdChange(cb: ((cwd: string) => void) | null) {
     this.onCwdChangeCallback = cb;
-  }
-
-  onScrollStateChange(cb: (isAtBottom: boolean) => void) {
-    this.onScrollStateChangeCallback = cb;
-  }
-
-  scrollToBottom() {
-    this.terminal.scrollToBottom();
-    this.emitScrollState();
   }
 
   setTheme(isDark: boolean) {
@@ -672,7 +607,6 @@ export class TerminalSessionManager {
   private async startPty(resume: boolean = false): Promise<{
     reattached: boolean;
     isDirectSpawn: boolean;
-    taskContextMeta: import('../../shared/types').TaskContextMeta | null;
   }> {
     const dims = this.fitAddon.proposeDimensions();
     const cols = this.ptyCols(dims?.cols ?? 120);
@@ -680,8 +614,6 @@ export class TerminalSessionManager {
 
     let reattached = false;
     let isDirectSpawn = false;
-    let taskContextMeta: import('../../shared/types').TaskContextMeta | null = null;
-
     const resp = await window.electronAPI.ptyStartDirect({
       id: this.id,
       cwd: this.cwd,
@@ -695,7 +627,6 @@ export class TerminalSessionManager {
     if (resp.success) {
       reattached = resp.data?.reattached ?? false;
       isDirectSpawn = resp.data?.isDirectSpawn ?? true;
-      taskContextMeta = resp.data?.taskContextMeta ?? null;
     } else {
       const isNativeModuleError = resp.error?.includes('[native module]');
 
@@ -736,7 +667,7 @@ export class TerminalSessionManager {
 
     this.ptyStarted = true;
 
-    return { reattached, isDirectSpawn, taskContextMeta };
+    return { reattached, isDirectSpawn };
   }
 
   private fireReady() {
@@ -864,19 +795,6 @@ export class TerminalSessionManager {
       this.terminal.scrollToLine(line > 0 ? line - 1 : line + 1);
     }
     this.terminal.scrollToLine(line);
-  }
-
-  private isAtBottom(): boolean {
-    const buf = this.terminal.buffer.active;
-    return buf.baseY - buf.viewportY <= 10;
-  }
-
-  private emitScrollState() {
-    const atBottom = this.isAtBottom();
-    if (atBottom !== this.lastEmittedAtBottom) {
-      this.lastEmittedAtBottom = atBottom;
-      this.onScrollStateChangeCallback?.(atBottom);
-    }
   }
 
   private checkMemory() {
