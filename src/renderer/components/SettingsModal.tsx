@@ -541,14 +541,15 @@ function ThresholdInput({
         <input
           type="number"
           min={0}
-          step={suffix === '$' ? 0.5 : 5}
+          step={5}
           value={value ?? ''}
           onChange={(e) => {
             const raw = e.target.value;
-            onChange(raw === '' ? null : Number(raw));
+            const n = Number(raw);
+            onChange(raw === '' || !Number.isFinite(n) || n < 0 ? null : Math.min(100, n));
           }}
           placeholder={placeholder ?? 'Off'}
-          className="w-[72px] px-2 py-1 rounded-md text-[12px] text-right tabular-nums bg-surface-2 border border-border/40 text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          className="w-[72px] px-2 py-1 rounded-md text-[12px] text-right tabular-nums border border-border/40 text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
           style={{ background: 'hsl(var(--surface-2))' }}
         />
         {suffix && <span className="text-[11px] text-foreground/40">{suffix}</span>}

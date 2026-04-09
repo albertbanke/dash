@@ -154,7 +154,7 @@ export interface StatusLineData {
   cost?: SessionCost;
   rateLimits?: RateLimits;
   model?: string;
-  updatedAt: string;
+  updatedAt: number; // epoch ms
 }
 
 export interface UsageThresholds {
@@ -171,7 +171,7 @@ export type ActivityState = 'busy' | 'idle' | 'waiting' | 'error';
 export interface ToolActivity {
   /** Raw tool name from Claude Code (e.g. "Bash", "Edit", "Grep", "Agent"). */
   toolName: string;
-  /** Short human-readable description (e.g. "Running tests...", "Editing src/main.ts..."). */
+  /** Short human-readable description (e.g. "Running command", "Editing main.ts"). */
   label: string;
 }
 

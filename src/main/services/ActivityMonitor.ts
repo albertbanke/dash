@@ -256,18 +256,18 @@ class ActivityMonitorImpl {
    * Record a stop failure (StopFailure hook).
    * Transitions to error state with details about the failure.
    */
+  private static readonly ERROR_TYPE_MAP: Record<string, ActivityError['type']> = {
+    rate_limit: 'rate_limit',
+    authentication_failed: 'auth_error',
+    billing_error: 'billing_error',
+  };
+
   setError(ptyId: string, errorType: string, message?: string): void {
     const activity = this.activities.get(ptyId);
     if (!activity) return;
 
     const mappedType: ActivityError['type'] =
-      errorType === 'rate_limit'
-        ? 'rate_limit'
-        : errorType === 'authentication_failed'
-          ? 'auth_error'
-          : errorType === 'billing_error'
-            ? 'billing_error'
-            : 'unknown';
+      ActivityMonitorImpl.ERROR_TYPE_MAP[errorType] ?? 'unknown';
 
     activity.state = 'error';
     activity.tool = null;

@@ -5,8 +5,8 @@ export function useStatusLine() {
   const [statusLineData, setStatusLineData] = useState<Record<string, StatusLineData>>({});
 
   // Subscribe to status line updates from main process.
-  // Stale entry cleanup is handled by ContextUsageService.unregister() on PTY exit
-  // and pruneStale() in the main process as a crash-recovery safety net.
+  // Stale entry cleanup is handled by ContextUsageService.unregister() on PTY exit.
+  // The Map is in-memory, so stale entries from crashes are cleared on app restart.
   useEffect(() => {
     const unsubscribe = window.electronAPI.onPtyStatusLine((data) => {
       setStatusLineData(data as Record<string, StatusLineData>);
@@ -19,8 +19,8 @@ export function useStatusLine() {
           setStatusLineData(resp.data);
         }
       })
-      .catch(() => {
-        // IPC not ready yet — live updates will arrive via onPtyStatusLine
+      .catch((err) => {
+        console.warn('[useStatusLine] Initial fetch failed:', err);
       });
 
     return unsubscribe;
@@ -40,9 +40,9 @@ export function useStatusLine() {
     let best: RateLimits | undefined;
     let bestTime = 0;
     for (const sl of Object.values(statusLineData)) {
-      if (sl.rateLimits && new Date(sl.updatedAt).getTime() > bestTime) {
+      if (sl.rateLimits && sl.updatedAt > bestTime) {
         best = sl.rateLimits;
-        bestTime = new Date(sl.updatedAt).getTime();
+        bestTime = sl.updatedAt;
       }
     }
     return best;

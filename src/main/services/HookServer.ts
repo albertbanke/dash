@@ -35,8 +35,8 @@ class HookServerImpl {
           if (task?.name) {
             body = `${task.name} finished`;
           }
-        } catch {
-          // DB lookup failed — use fallback
+        } catch (err) {
+          console.warn('[HookServer] DB lookup for notification body failed:', err);
         }
       }
       const n = new Notification({
@@ -61,7 +61,8 @@ class HookServerImpl {
       const db = getDb();
       const task = db.select({ name: tasks.name }).from(tasks).where(eq(tasks.id, ptyId)).get();
       return task?.name || 'A task';
-    } catch {
+    } catch (err) {
+      console.warn('[HookServer] DB lookup for task name failed:', err);
       return 'A task';
     }
   }
@@ -82,18 +83,38 @@ class HookServerImpl {
         req.destroy();
       }
     });
+    req.on('error', () => {
+      if (!res.headersSent) {
+        res.writeHead(400);
+        res.end();
+      }
+    });
     req.on('end', () => {
       if (overflow) {
         res.writeHead(413);
         res.end('payload too large');
         return;
       }
+      let parsed: Record<string, unknown>;
       try {
-        callback(JSON.parse(body));
+        parsed = JSON.parse(body);
       } catch (err) {
         console.error('[HookServer] Failed to parse JSON body:', err);
         res.writeHead(400);
         res.end('bad request');
+        return;
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        res.writeHead(400);
+        res.end('expected JSON object');
+        return;
+      }
+      try {
+        callback(parsed);
+      } catch (err) {
+        console.error('[HookServer] Callback error:', err);
+        res.writeHead(500);
+        res.end();
       }
     });
   }
@@ -139,8 +160,9 @@ class HookServerImpl {
 
         if (pathname === '/hook/notification') {
           this.readJsonBody(req, res, 65_536, (payload) => {
-            const notificationType = payload.notification_type as string;
-            const message = payload.message as string | undefined;
+            const notificationType =
+              typeof payload.notification_type === 'string' ? payload.notification_type : '';
+            const message = typeof payload.message === 'string' ? payload.message : undefined;
 
             if (notificationType === 'permission_prompt') {
               activityMonitor.setWaitingForPermission(ptyId);
@@ -160,7 +182,7 @@ class HookServerImpl {
           return;
         }
 
-        // StatusLine — context usage data (from curl command, not a hook)
+        // StatusLine data (context usage) — uses type:"command" + curl, not type:"http"
         if (pathname === '/hook/context') {
           this.readJsonBody(req, res, 65_536, (data) => {
             contextUsageService.updateFromStatusLine(ptyId, data);
@@ -173,8 +195,11 @@ class HookServerImpl {
 
         if (pathname === '/hook/tool-start') {
           this.readJsonBody(req, res, 65_536, (payload) => {
-            const toolName = (payload.tool_name as string) || 'unknown';
-            const toolInput = payload.tool_input as Record<string, unknown> | undefined;
+            const toolName = typeof payload.tool_name === 'string' ? payload.tool_name : 'unknown';
+            const toolInput =
+              payload.tool_input && typeof payload.tool_input === 'object'
+                ? (payload.tool_input as Record<string, unknown>)
+                : undefined;
             activityMonitor.setToolStart(ptyId, toolName, toolInput);
             res.writeHead(200);
             res.end();
@@ -193,8 +218,9 @@ class HookServerImpl {
 
         if (pathname === '/hook/stop-failure') {
           this.readJsonBody(req, res, 65_536, (payload) => {
-            const errorType = (payload.error_type as string) || 'unknown';
-            const message = payload.error as string | undefined;
+            const errorType =
+              typeof payload.error_type === 'string' ? payload.error_type : 'unknown';
+            const message = typeof payload.error === 'string' ? payload.error : undefined;
             console.error(`[HookServer] StopFailure for ptyId=${ptyId} type=${errorType}`);
             activityMonitor.setError(ptyId, errorType, message);
 

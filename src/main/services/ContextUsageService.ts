@@ -1,12 +1,13 @@
 import type { WebContents } from 'electron';
 import type { ContextUsage, StatusLineData, SessionCost, RateLimits } from '@shared/types';
 
+const EMIT_DEBOUNCE_MS = 500;
+
 /**
  * Tracks context window usage and session stats for each PTY.
  * Receives structured JSON data from Claude Code's statusLine feature
  * via the HookServer's /hook/context endpoint.
  */
-const EMIT_DEBOUNCE_MS = 500;
 
 class ContextUsageServiceImpl {
   private statusLineData = new Map<string, StatusLineData>();
@@ -45,19 +46,21 @@ class ContextUsageServiceImpl {
     // Compute percentage from used/total to keep fields consistent
     const percentage = Math.max(0, Math.min(100, total > 0 ? (used / total) * 100 : 0));
 
-    const now = new Date().toISOString();
+    const now = Date.now();
 
     const usage: ContextUsage = { used, total, percentage };
 
     // Parse cost
     let cost: SessionCost | undefined;
     if (data.cost && typeof data.cost === 'object') {
+      const c = data.cost;
       cost = {
-        totalCostUsd: data.cost.total_cost_usd ?? 0,
-        totalDurationMs: data.cost.total_duration_ms ?? 0,
-        totalApiDurationMs: data.cost.total_api_duration_ms ?? 0,
-        totalLinesAdded: data.cost.total_lines_added ?? 0,
-        totalLinesRemoved: data.cost.total_lines_removed ?? 0,
+        totalCostUsd: typeof c.total_cost_usd === 'number' ? c.total_cost_usd : 0,
+        totalDurationMs: typeof c.total_duration_ms === 'number' ? c.total_duration_ms : 0,
+        totalApiDurationMs:
+          typeof c.total_api_duration_ms === 'number' ? c.total_api_duration_ms : 0,
+        totalLinesAdded: typeof c.total_lines_added === 'number' ? c.total_lines_added : 0,
+        totalLinesRemoved: typeof c.total_lines_removed === 'number' ? c.total_lines_removed : 0,
       };
     }
 
@@ -65,16 +68,18 @@ class ContextUsageServiceImpl {
     let rateLimits: RateLimits | undefined;
     if (data.rate_limits && typeof data.rate_limits === 'object') {
       rateLimits = {};
-      if (data.rate_limits.five_hour) {
+      const fh = data.rate_limits.five_hour;
+      if (fh) {
         rateLimits.fiveHour = {
-          usedPercentage: data.rate_limits.five_hour.used_percentage ?? 0,
-          resetsAt: data.rate_limits.five_hour.resets_at ?? 0,
+          usedPercentage: typeof fh.used_percentage === 'number' ? fh.used_percentage : 0,
+          resetsAt: typeof fh.resets_at === 'number' ? fh.resets_at : 0,
         };
       }
-      if (data.rate_limits.seven_day) {
+      const sd = data.rate_limits.seven_day;
+      if (sd) {
         rateLimits.sevenDay = {
-          usedPercentage: data.rate_limits.seven_day.used_percentage ?? 0,
-          resetsAt: data.rate_limits.seven_day.resets_at ?? 0,
+          usedPercentage: typeof sd.used_percentage === 'number' ? sd.used_percentage : 0,
+          resetsAt: typeof sd.resets_at === 'number' ? sd.resets_at : 0,
         };
       }
     }
