@@ -257,8 +257,9 @@ class ActivityMonitorImpl {
       activity.error = null;
     }
 
-    activity.lastDataTime = Date.now();
-    activity.lastChildSeenTime = Date.now();
+    const now = Date.now();
+    activity.lastDataTime = now;
+    activity.lastChildSeenTime = now;
     this.emitAll();
   }
 
@@ -270,8 +271,9 @@ class ActivityMonitorImpl {
     const activity = this.activities.get(ptyId);
     if (!activity) return;
     activity.tool = null;
-    activity.lastDataTime = Date.now();
-    activity.lastChildSeenTime = Date.now();
+    const now = Date.now();
+    activity.lastDataTime = now;
+    activity.lastChildSeenTime = now;
     this.emitAll();
   }
 

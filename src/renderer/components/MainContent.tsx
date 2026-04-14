@@ -203,6 +203,7 @@ export function MainContent({
       : null;
 
   const branchTooltip = gitStatus?.hasUpstream ? 'Branch' : 'Branch (no upstream detected)';
+  const BranchIcon = activeTask.useWorktree ? FolderGit2 : GitBranch;
 
   const branchLabel = currentBranchUrl ? (
     <a
@@ -215,6 +216,15 @@ export function MainContent({
     </a>
   ) : (
     <span className="text-[11px] font-mono truncate">{currentBranch}</span>
+  );
+
+  const branchBadge = (
+    <Tooltip content={branchTooltip}>
+      <div className="flex items-center gap-1.5 text-foreground/60 min-w-0 flex-shrink max-w-[180px]">
+        <BranchIcon size={11} strokeWidth={2} className="flex-shrink-0" />
+        {branchLabel}
+      </div>
+    </Tooltip>
   );
 
   const activeCtxRaw = activeTask ? contextUsage[activeTask.id] : undefined;
@@ -267,21 +277,7 @@ export function MainContent({
               </button>
             ))}
           </div>
-          {activeTask.useWorktree ? (
-            <Tooltip content={branchTooltip}>
-              <div className="flex items-center gap-1.5 text-foreground/60 min-w-0 flex-shrink max-w-[180px]">
-                <FolderGit2 size={11} strokeWidth={2} className="flex-shrink-0" />
-                {branchLabel}
-              </div>
-            </Tooltip>
-          ) : (
-            <Tooltip content={branchTooltip}>
-              <div className="flex items-center gap-1.5 text-foreground/60 min-w-0 flex-shrink max-w-[180px]">
-                <GitBranch size={11} strokeWidth={2} className="flex-shrink-0" />
-                {branchLabel}
-              </div>
-            </Tooltip>
-          )}
+          {branchBadge}
         </>
       ) : (
         <>
@@ -316,21 +312,7 @@ export function MainContent({
                 </span>
               </div>
             )}
-            {activeTask.useWorktree ? (
-              <Tooltip content={branchTooltip}>
-                <div className="flex items-center gap-1.5 text-foreground/60 min-w-0 flex-shrink max-w-[180px]">
-                  <FolderGit2 size={11} strokeWidth={2} className="flex-shrink-0" />
-                  {branchLabel}
-                </div>
-              </Tooltip>
-            ) : (
-              <Tooltip content={branchTooltip}>
-                <div className="flex items-center gap-1.5 text-foreground/60 min-w-0 flex-shrink max-w-[180px]">
-                  <GitBranch size={11} strokeWidth={2} className="flex-shrink-0" />
-                  {branchLabel}
-                </div>
-              </Tooltip>
-            )}
+            {branchBadge}
             {taskActivity[activeTask.id] && (
               <Tooltip content="Remote control">
                 <button

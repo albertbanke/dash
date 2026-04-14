@@ -124,11 +124,7 @@ class ContextUsageServiceImpl {
   }
 
   getAllStatusLine(): Record<string, StatusLineData> {
-    const result: Record<string, StatusLineData> = {};
-    for (const [id, sl] of this.statusLineData) {
-      result[id] = sl;
-    }
-    return result;
+    return Object.fromEntries(this.statusLineData);
   }
 
   unregister(ptyId: string): void {
