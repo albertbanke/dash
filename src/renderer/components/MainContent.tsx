@@ -16,15 +16,11 @@ import type {
   Task,
   LinkedItem,
   RemoteControlState,
-  ContextUsage,
   PullRequestInfo,
   GitStatus,
 } from '../../shared/types';
 import { linkedItemUrl, isAdoRemote, branchUrl } from '../../shared/urls';
 import { Tooltip } from './ui/Tooltip';
-
-import { formatTokens } from '../../shared/format';
-import { UsageBarInline, usageTextColor } from './ui/UsageBar';
 
 function LinkedItemBadges({
   items,
@@ -82,7 +78,6 @@ interface MainContentProps {
   taskActivity?: Record<string, import('../../shared/types').ActivityInfo>;
   unseenTaskIds?: Set<string>;
   remoteControlStates?: Record<string, RemoteControlState>;
-  contextUsage?: Record<string, ContextUsage>;
   onSelectTask?: (id: string) => void;
   onEnableRemoteControl?: (taskId: string) => void;
   onNewTask?: () => void;
@@ -105,7 +100,6 @@ export function MainContent({
   taskActivity = {},
   unseenTaskIds,
   remoteControlStates = {},
-  contextUsage = {},
   onSelectTask,
   onEnableRemoteControl,
   onNewTask,
@@ -228,9 +222,6 @@ export function MainContent({
     </Tooltip>
   );
 
-  const activeCtxRaw = activeTask ? contextUsage[activeTask.id] : undefined;
-  const activeCtx = activeCtxRaw && activeCtxRaw.percentage > 0 ? activeCtxRaw : undefined;
-
   const taskHeader = (
     <div
       className="flex items-center gap-3 px-4 h-10 flex-shrink-0 border-b border-border/60"
@@ -295,24 +286,6 @@ export function MainContent({
             />
           )}
           <div className="ml-auto flex items-center gap-1.5">
-            {/* Context usage indicator */}
-            {activeCtx && (
-              <div
-                className="flex items-center gap-1.5"
-                title={`Context: ${activeCtx.used.toLocaleString()} / ${activeCtx.total.toLocaleString()} tokens (${Math.round(activeCtx.percentage)}%)`}
-              >
-                <UsageBarInline percentage={activeCtx.percentage} />
-                <span
-                  className={`text-[10px] tabular-nums ${
-                    activeCtx.percentage >= 80
-                      ? 'text-red-400 font-medium'
-                      : usageTextColor(activeCtx.percentage)
-                  }`}
-                >
-                  {formatTokens(activeCtx.used)}/{formatTokens(activeCtx.total)}
-                </span>
-              </div>
-            )}
             {branchBadge}
             {taskActivity[activeTask.id] && (
               <Tooltip content="Remote control">

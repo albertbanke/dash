@@ -60,8 +60,14 @@ interface SettingsModalProps {
   onNotificationSoundChange: (value: NotificationSound) => void;
   desktopNotification: boolean;
   onDesktopNotificationChange: (value: boolean) => void;
+  showUsageWidget: boolean;
+  onShowUsageWidgetChange: (value: boolean) => void;
+  showRateLimits: boolean;
+  onShowRateLimitsChange: (value: boolean) => void;
   showUsageInline: boolean;
   onShowUsageInlineChange: (value: boolean) => void;
+  showContextUsageOnTaskCards: boolean;
+  onShowContextUsageOnTaskCardsChange: (value: boolean) => void;
   showActiveTasksSection: boolean;
   onShowActiveTasksSectionChange: (value: boolean) => void;
   shellDrawerEnabled: boolean;
@@ -587,16 +593,28 @@ function UsageSection({
   latestRateLimits,
   thresholds,
   onThresholdsChange,
+  showUsageWidget,
+  onShowUsageWidgetChange,
+  showRateLimits,
+  onShowRateLimitsChange,
   showUsageInline,
   onShowUsageInlineChange,
+  showContextUsageOnTaskCards,
+  onShowContextUsageOnTaskCardsChange,
 }: {
   statusLineData: Record<string, StatusLineData>;
   taskNames: Record<string, string>;
   latestRateLimits?: RateLimits;
   thresholds: UsageThresholds;
   onThresholdsChange: (t: UsageThresholds) => void;
+  showUsageWidget: boolean;
+  onShowUsageWidgetChange: (value: boolean) => void;
+  showRateLimits: boolean;
+  onShowRateLimitsChange: (value: boolean) => void;
   showUsageInline: boolean;
   onShowUsageInlineChange: (value: boolean) => void;
+  showContextUsageOnTaskCards: boolean;
+  onShowContextUsageOnTaskCardsChange: (value: boolean) => void;
 }) {
   const entries = Object.entries(statusLineData);
 
@@ -708,13 +726,49 @@ function UsageSection({
           <div className="flex-1 h-px bg-border/30" />
         </div>
         <ToggleSwitch
-          enabled={showUsageInline}
-          onToggle={onShowUsageInlineChange}
-          label="Show context usage in sidebar and header"
+          enabled={showUsageWidget}
+          onToggle={onShowUsageWidgetChange}
+          label="Show usage widget"
         />
         <p className="text-[10px] text-foreground/40 mt-2">
-          Display context window percentage and progress bars next to tasks.
+          Display the usage widget in the right sidebar.
         </p>
+        {showUsageWidget && (
+          <div className="mt-3 pl-4 border-l-2 border-border/40 space-y-4">
+            <div>
+              <ToggleSwitch
+                enabled={showRateLimits}
+                onToggle={onShowRateLimitsChange}
+                label="Show rate limits"
+              />
+              <p className="text-[10px] text-foreground/40 mt-2">
+                Display the 5-hour and 7-day account rate limit bars.
+              </p>
+            </div>
+            <div>
+              <ToggleSwitch
+                enabled={showUsageInline}
+                onToggle={onShowUsageInlineChange}
+                label="Show context usage"
+              />
+              <p className="text-[10px] text-foreground/40 mt-2">
+                Display the current session&apos;s context window usage.
+              </p>
+              {showUsageInline && (
+                <div className="mt-3 pl-4 border-l-2 border-border/40">
+                  <ToggleSwitch
+                    enabled={showContextUsageOnTaskCards}
+                    onToggle={onShowContextUsageOnTaskCardsChange}
+                    label="Show progress bar on task cards"
+                  />
+                  <p className="text-[10px] text-foreground/40 mt-2">
+                    Adds a thin usage bar under each task in the left sidebar.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Threshold Alerts */}
@@ -964,8 +1018,14 @@ export function SettingsModal({
   onNotificationSoundChange,
   desktopNotification,
   onDesktopNotificationChange,
+  showUsageWidget,
+  onShowUsageWidgetChange,
+  showRateLimits,
+  onShowRateLimitsChange,
   showUsageInline,
   onShowUsageInlineChange,
+  showContextUsageOnTaskCards,
+  onShowContextUsageOnTaskCardsChange,
   showActiveTasksSection,
   onShowActiveTasksSectionChange,
   shellDrawerEnabled,
@@ -1225,22 +1285,6 @@ export function SettingsModal({
                 />
                 <p className="text-[10px] text-foreground/80 mt-2">
                   Notification will include the task name
-                </p>
-              </div>
-
-              {/* Inline Usage */}
-              <div>
-                <label className="block text-[12px] font-medium text-foreground mb-3">
-                  Inline Usage
-                </label>
-                <ToggleSwitch
-                  enabled={showUsageInline}
-                  onToggle={onShowUsageInlineChange}
-                  label="Show context usage in sidebar and header"
-                />
-                <p className="text-[10px] text-foreground/80 mt-2">
-                  Display context window percentage and progress bars next to tasks. Detailed stats
-                  are always available in the Usage tab.
                 </p>
               </div>
 
@@ -1696,8 +1740,14 @@ export function SettingsModal({
               latestRateLimits={latestRateLimits}
               thresholds={usageThresholds}
               onThresholdsChange={onUsageThresholdsChange}
+              showUsageWidget={showUsageWidget}
+              onShowUsageWidgetChange={onShowUsageWidgetChange}
+              showRateLimits={showRateLimits}
+              onShowRateLimitsChange={onShowRateLimitsChange}
               showUsageInline={showUsageInline}
               onShowUsageInlineChange={onShowUsageInlineChange}
+              showContextUsageOnTaskCards={showContextUsageOnTaskCards}
+              onShowContextUsageOnTaskCardsChange={onShowContextUsageOnTaskCardsChange}
             />
           )}
 

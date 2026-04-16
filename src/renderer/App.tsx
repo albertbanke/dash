@@ -19,7 +19,7 @@ import { RemoteControlModal } from './components/RemoteControlModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { AdoSetupModal } from './components/AdoSetupModal';
-import { RateLimitsWidget } from './components/RateLimitsWidget';
+import { UsageWidget } from './components/UsageWidget';
 import { parseAdoRemote } from '../shared/urls';
 import { ToastContainer } from './components/Toast';
 import { toast } from 'sonner';
@@ -47,6 +47,7 @@ import { playNotificationSound, playPeonSound } from './sounds';
 import type { NotificationSound } from './sounds';
 
 const GIT_POLL_INTERVAL = 5000;
+const EMPTY_CONTEXT_USAGE: Record<string, import('../shared/types').ContextUsage> = {};
 
 export function App() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -279,13 +280,37 @@ export function App() {
     });
   }, [activeTaskId]);
 
-  // Show inline usage bars in sidebar and header
+  // Usage widget (right sidebar) — primary toggle
+  const [showUsageWidget, setShowUsageWidget] = useState(
+    () => localStorage.getItem('showUsageWidget') !== 'false',
+  );
+  useEffect(() => {
+    localStorage.setItem('showUsageWidget', String(showUsageWidget));
+  }, [showUsageWidget]);
+
+  // Dependent: show 5-hour / 7-day rate limit bars inside the widget
+  const [showRateLimits, setShowRateLimits] = useState(
+    () => localStorage.getItem('showRateLimits') !== 'false',
+  );
+  useEffect(() => {
+    localStorage.setItem('showRateLimits', String(showRateLimits));
+  }, [showRateLimits]);
+
+  // Dependent: show the current session (context) usage bar inside the widget
   const [showUsageInline, setShowUsageInline] = useState(
     () => localStorage.getItem('showUsageInline') !== 'false',
   );
   useEffect(() => {
     localStorage.setItem('showUsageInline', String(showUsageInline));
   }, [showUsageInline]);
+
+  // Dependent of showUsageInline: show context progress bar under each task card
+  const [showContextUsageOnTaskCards, setShowContextUsageOnTaskCards] = useState(
+    () => localStorage.getItem('showContextUsageOnTaskCards') !== 'false',
+  );
+  useEffect(() => {
+    localStorage.setItem('showContextUsageOnTaskCards', String(showContextUsageOnTaskCards));
+  }, [showContextUsageOnTaskCards]);
 
   // Rotation — tasks the user cycles through with Ctrl+Tab
   const [showActiveTasksSection, setShowActiveTasksSection] = useState(
@@ -1377,7 +1402,9 @@ export function App() {
               taskActivity={taskActivity}
               unseenTaskIds={unseenTaskIds}
               remoteControlStates={remoteControlStates}
-              contextUsage={showUsageInline ? contextUsage : {}}
+              contextUsage={
+                showUsageInline && showContextUsageOnTaskCards ? contextUsage : EMPTY_CONTEXT_USAGE
+              }
               onReorderProjects={handleReorderProjects}
               pixelAgentsConnectedCount={
                 Object.values(pixelAgentsStatus.offices).filter(
@@ -1426,7 +1453,6 @@ export function App() {
               taskActivity={taskActivity}
               unseenTaskIds={unseenTaskIds}
               remoteControlStates={remoteControlStates}
-              contextUsage={showUsageInline ? contextUsage : {}}
               onSelectTask={setActiveTaskId}
               onEnableRemoteControl={(taskId) => setRemoteControlModalPtyId(taskId)}
               onNewTask={() => activeProjectId && handleNewTask(activeProjectId)}
@@ -1479,10 +1505,16 @@ export function App() {
             >
               <div className="h-full flex flex-col overflow-hidden">
                 {!changesPanelCollapsed &&
-                  latestRateLimits &&
-                  (latestRateLimits.fiveHour || latestRateLimits.sevenDay) && (
-                    <RateLimitsWidget rateLimits={latestRateLimits} />
-                  )}
+                  showUsageWidget &&
+                  (() => {
+                    const rawCtx = activeTask ? contextUsage[activeTask.id] : undefined;
+                    const activeCtx = showUsageInline ? rawCtx : undefined;
+                    const rateLimits = showRateLimits && latestRateLimits ? latestRateLimits : {};
+                    const hasRateLimits = rateLimits.fiveHour || rateLimits.sevenDay;
+                    const hasCtx = activeCtx && activeCtx.percentage > 0;
+                    if (!hasRateLimits && !hasCtx) return null;
+                    return <UsageWidget rateLimits={rateLimits} contextUsage={activeCtx} />;
+                  })()}
                 <ShellDrawerWrapper
                   enabled={
                     shellDrawerEnabled && shellDrawerPosition === 'right' && !changesPanelCollapsed
@@ -1610,8 +1642,14 @@ export function App() {
             localStorage.setItem('theme', t);
             sessionRegistry.setAllTerminalThemes(terminalTheme, t === 'dark');
           }}
+          showUsageWidget={showUsageWidget}
+          onShowUsageWidgetChange={setShowUsageWidget}
+          showRateLimits={showRateLimits}
+          onShowRateLimitsChange={setShowRateLimits}
           showUsageInline={showUsageInline}
           onShowUsageInlineChange={setShowUsageInline}
+          showContextUsageOnTaskCards={showContextUsageOnTaskCards}
+          onShowContextUsageOnTaskCardsChange={setShowContextUsageOnTaskCards}
           showActiveTasksSection={showActiveTasksSection}
           onShowActiveTasksSectionChange={setShowActiveTasksSection}
           shellDrawerEnabled={shellDrawerEnabled}
