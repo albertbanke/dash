@@ -280,15 +280,7 @@ export function App() {
     });
   }, [activeTaskId]);
 
-  // Usage widget (right sidebar) — primary toggle
-  const [showUsageWidget, setShowUsageWidget] = useState(
-    () => localStorage.getItem('showUsageWidget') !== 'false',
-  );
-  useEffect(() => {
-    localStorage.setItem('showUsageWidget', String(showUsageWidget));
-  }, [showUsageWidget]);
-
-  // Dependent: show 5-hour / 7-day rate limit bars inside the widget
+  // Right-sidebar: 5-hour / 7-day rate limit bars
   const [showRateLimits, setShowRateLimits] = useState(
     () => localStorage.getItem('showRateLimits') !== 'false',
   );
@@ -296,7 +288,7 @@ export function App() {
     localStorage.setItem('showRateLimits', String(showRateLimits));
   }, [showRateLimits]);
 
-  // Dependent: show the current session (context) usage bar inside the widget
+  // Right-sidebar: current session (context) usage bar
   const [showUsageInline, setShowUsageInline] = useState(
     () => localStorage.getItem('showUsageInline') !== 'false',
   );
@@ -304,7 +296,7 @@ export function App() {
     localStorage.setItem('showUsageInline', String(showUsageInline));
   }, [showUsageInline]);
 
-  // Dependent of showUsageInline: show context progress bar under each task card
+  // Left-sidebar task cards: context progress bar under each task
   const [showContextUsageOnTaskCards, setShowContextUsageOnTaskCards] = useState(
     () => localStorage.getItem('showContextUsageOnTaskCards') !== 'false',
   );
@@ -1402,9 +1394,7 @@ export function App() {
               taskActivity={taskActivity}
               unseenTaskIds={unseenTaskIds}
               remoteControlStates={remoteControlStates}
-              contextUsage={
-                showUsageInline && showContextUsageOnTaskCards ? contextUsage : EMPTY_CONTEXT_USAGE
-              }
+              contextUsage={showContextUsageOnTaskCards ? contextUsage : EMPTY_CONTEXT_USAGE}
               onReorderProjects={handleReorderProjects}
               pixelAgentsConnectedCount={
                 Object.values(pixelAgentsStatus.offices).filter(
@@ -1505,7 +1495,6 @@ export function App() {
             >
               <div className="h-full flex flex-col overflow-hidden">
                 {!changesPanelCollapsed &&
-                  showUsageWidget &&
                   (() => {
                     const rawCtx = activeTask ? contextUsage[activeTask.id] : undefined;
                     const activeCtx = showUsageInline ? rawCtx : undefined;
@@ -1642,8 +1631,6 @@ export function App() {
             localStorage.setItem('theme', t);
             sessionRegistry.setAllTerminalThemes(terminalTheme, t === 'dark');
           }}
-          showUsageWidget={showUsageWidget}
-          onShowUsageWidgetChange={setShowUsageWidget}
           showRateLimits={showRateLimits}
           onShowRateLimitsChange={setShowRateLimits}
           showUsageInline={showUsageInline}
@@ -1743,8 +1730,6 @@ export function App() {
             window.electronAPI.pixelAgentsSaveConfig(config);
           }}
           pixelAgentsStatus={pixelAgentsStatus}
-          statusLineData={statusLineData}
-          taskNames={taskNames}
           latestRateLimits={latestRateLimits}
           usageThresholds={usageThresholds}
           onUsageThresholdsChange={setUsageThresholds}

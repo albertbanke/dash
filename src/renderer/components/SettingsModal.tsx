@@ -32,11 +32,10 @@ import type {
   PixelAgentsStatus,
   PixelAgentsOffice,
   PixelAgentsOfficeStatus,
-  StatusLineData,
   RateLimits,
   UsageThresholds,
 } from '../../shared/types';
-import { formatTokens, formatDuration, formatResetTime } from '../../shared/format';
+import { formatResetTime } from '../../shared/format';
 import { UsageBar } from './ui/UsageBar';
 
 const DASH_DEFAULT_ATTRIBUTION =
@@ -60,8 +59,6 @@ interface SettingsModalProps {
   onNotificationSoundChange: (value: NotificationSound) => void;
   desktopNotification: boolean;
   onDesktopNotificationChange: (value: boolean) => void;
-  showUsageWidget: boolean;
-  onShowUsageWidgetChange: (value: boolean) => void;
   showRateLimits: boolean;
   onShowRateLimitsChange: (value: boolean) => void;
   showUsageInline: boolean;
@@ -95,8 +92,6 @@ interface SettingsModalProps {
   pixelAgentsConfig: PixelAgentsConfig | null;
   onPixelAgentsConfigChange: (config: PixelAgentsConfig) => void;
   pixelAgentsStatus: PixelAgentsStatus;
-  statusLineData: Record<string, StatusLineData>;
-  taskNames: Record<string, string>;
   latestRateLimits?: RateLimits;
   usageThresholds: UsageThresholds;
   onUsageThresholdsChange: (thresholds: UsageThresholds) => void;
@@ -570,6 +565,7 @@ function ThresholdInput({
         <input
           type="number"
           min={0}
+          max={100}
           step={5}
           value={value ?? ''}
           onChange={(e) => {
@@ -578,8 +574,7 @@ function ThresholdInput({
             onChange(raw === '' || !Number.isFinite(n) || n < 0 ? null : Math.min(100, n));
           }}
           placeholder={placeholder ?? 'Off'}
-          className="w-[72px] px-2 py-1 rounded-md text-[12px] text-right tabular-nums border border-border/40 text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
-          style={{ background: 'hsl(var(--surface-2))' }}
+          className="w-[88px] px-3 py-1.5 rounded-md text-[12px] text-right tabular-nums border border-border/60 bg-transparent text-foreground placeholder:text-foreground/30 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
         {suffix && <span className="text-[11px] text-foreground/40">{suffix}</span>}
       </div>
@@ -587,14 +582,49 @@ function ThresholdInput({
   );
 }
 
+function ToggleRow({
+  label,
+  description,
+  enabled,
+  onToggle,
+  indent = 0,
+}: {
+  label: string;
+  description?: string;
+  enabled: boolean;
+  onToggle: (v: boolean) => void;
+  indent?: number;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(!enabled)}
+      className="flex items-center justify-between w-full gap-3 py-3 pr-4 text-left"
+      style={{ paddingLeft: 16 + indent * 20 }}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-[12px] text-foreground">{label}</div>
+        {description && <div className="text-[10px] text-foreground/40 mt-0.5">{description}</div>}
+      </div>
+      <div
+        className={`w-8 h-[18px] rounded-full relative transition-colors duration-150 flex-shrink-0 ${
+          enabled ? 'bg-primary' : 'bg-border'
+        }`}
+      >
+        <div
+          className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
+            enabled ? 'translate-x-[16px]' : 'translate-x-[2px]'
+          }`}
+        />
+      </div>
+    </button>
+  );
+}
+
 function UsageSection({
-  statusLineData,
-  taskNames,
   latestRateLimits,
   thresholds,
   onThresholdsChange,
-  showUsageWidget,
-  onShowUsageWidgetChange,
   showRateLimits,
   onShowRateLimitsChange,
   showUsageInline,
@@ -602,13 +632,9 @@ function UsageSection({
   showContextUsageOnTaskCards,
   onShowContextUsageOnTaskCardsChange,
 }: {
-  statusLineData: Record<string, StatusLineData>;
-  taskNames: Record<string, string>;
   latestRateLimits?: RateLimits;
   thresholds: UsageThresholds;
   onThresholdsChange: (t: UsageThresholds) => void;
-  showUsageWidget: boolean;
-  onShowUsageWidgetChange: (value: boolean) => void;
   showRateLimits: boolean;
   onShowRateLimitsChange: (value: boolean) => void;
   showUsageInline: boolean;
@@ -616,8 +642,6 @@ function UsageSection({
   showContextUsageOnTaskCards: boolean;
   onShowContextUsageOnTaskCardsChange: (value: boolean) => void;
 }) {
-  const entries = Object.entries(statusLineData);
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Account-wide rate limits */}
@@ -664,60 +688,7 @@ function UsageSection({
         )}
       </div>
 
-      {/* Per-session context usage */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/60">
-            Sessions
-          </span>
-          <div className="flex-1 h-px bg-border/30" />
-        </div>
-
-        {entries.length === 0 ? (
-          <p className="text-[12px] text-foreground/40 py-4 text-center">No active sessions</p>
-        ) : (
-          <div className="space-y-3">
-            {entries.map(([ptyId, sl]) => (
-              <div
-                key={ptyId}
-                className="rounded-xl border border-border/40 p-4 space-y-3"
-                style={{ background: 'hsl(var(--surface-2))' }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-medium text-foreground/80 truncate">
-                    {taskNames[ptyId] || 'Unknown task'}
-                  </span>
-                  <span className="text-[10px] text-foreground/40 flex-shrink-0">
-                    {sl.model ?? 'Claude'}
-                  </span>
-                </div>
-
-                <UsageBar
-                  label="Context"
-                  percentage={sl.contextUsage.percentage}
-                  detail={`${formatTokens(sl.contextUsage.used)} / ${formatTokens(sl.contextUsage.total)}`}
-                />
-
-                {sl.cost && (
-                  <div className="flex items-center gap-4 pt-1 text-[10px] text-foreground/40">
-                    <span>API: {formatDuration(sl.cost.totalApiDurationMs)}</span>
-                    <span>Wall: {formatDuration(sl.cost.totalDurationMs)}</span>
-                    {(sl.cost.totalLinesAdded > 0 || sl.cost.totalLinesRemoved > 0) && (
-                      <span>
-                        <span className="text-emerald-400">+{sl.cost.totalLinesAdded}</span>
-                        {' / '}
-                        <span className="text-red-400">-{sl.cost.totalLinesRemoved}</span>
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Inline Usage Display */}
+      {/* Display */}
       <div>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/60">
@@ -725,50 +696,29 @@ function UsageSection({
           </span>
           <div className="flex-1 h-px bg-border/30" />
         </div>
-        <ToggleSwitch
-          enabled={showUsageWidget}
-          onToggle={onShowUsageWidgetChange}
-          label="Show usage widget"
-        />
-        <p className="text-[10px] text-foreground/40 mt-2">
-          Display the usage widget in the right sidebar.
-        </p>
-        {showUsageWidget && (
-          <div className="mt-3 pl-4 border-l-2 border-border/40 space-y-4">
-            <div>
-              <ToggleSwitch
-                enabled={showRateLimits}
-                onToggle={onShowRateLimitsChange}
-                label="Show rate limits"
-              />
-              <p className="text-[10px] text-foreground/40 mt-2">
-                Display the 5-hour and 7-day account rate limit bars.
-              </p>
-            </div>
-            <div>
-              <ToggleSwitch
-                enabled={showUsageInline}
-                onToggle={onShowUsageInlineChange}
-                label="Show context usage"
-              />
-              <p className="text-[10px] text-foreground/40 mt-2">
-                Display the current session&apos;s context window usage.
-              </p>
-              {showUsageInline && (
-                <div className="mt-3 pl-4 border-l-2 border-border/40">
-                  <ToggleSwitch
-                    enabled={showContextUsageOnTaskCards}
-                    onToggle={onShowContextUsageOnTaskCardsChange}
-                    label="Show progress bar on task cards"
-                  />
-                  <p className="text-[10px] text-foreground/40 mt-2">
-                    Adds a thin usage bar under each task in the left sidebar.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        <div
+          className="rounded-xl border border-border/40 divide-y divide-border/20 overflow-hidden"
+          style={{ background: 'hsl(var(--surface-2))' }}
+        >
+          <ToggleRow
+            label="Show rate limits"
+            description="Display the 5-hour and 7-day account rate limit bars in the right sidebar."
+            enabled={showRateLimits}
+            onToggle={onShowRateLimitsChange}
+          />
+          <ToggleRow
+            label="Show context usage"
+            description="Display the current session's context window usage in the right sidebar."
+            enabled={showUsageInline}
+            onToggle={onShowUsageInlineChange}
+          />
+          <ToggleRow
+            label="Show progress bar on task cards"
+            description="Adds a thin context usage bar under each task in the left sidebar."
+            enabled={showContextUsageOnTaskCards}
+            onToggle={onShowContextUsageOnTaskCardsChange}
+          />
+        </div>
       </div>
 
       {/* Threshold Alerts */}
@@ -1018,8 +968,6 @@ export function SettingsModal({
   onNotificationSoundChange,
   desktopNotification,
   onDesktopNotificationChange,
-  showUsageWidget,
-  onShowUsageWidgetChange,
   showRateLimits,
   onShowRateLimitsChange,
   showUsageInline,
@@ -1053,8 +1001,6 @@ export function SettingsModal({
   pixelAgentsConfig,
   onPixelAgentsConfigChange,
   pixelAgentsStatus,
-  statusLineData,
-  taskNames,
   latestRateLimits,
   usageThresholds,
   onUsageThresholdsChange,
@@ -1196,18 +1142,12 @@ export function SettingsModal({
               }`}
             >
               {t.label}
-              {t.id === 'pixel-agents' && (
-                <>
-                  {Object.values(pixelAgentsStatus.offices).some(
-                    (s) => s === 'connected' || s === 'registered',
-                  ) && (
-                    <span className="ml-1.5 w-2 h-2 rounded-full bg-[hsl(var(--git-added))] inline-block" />
-                  )}
-                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-primary/15 text-primary leading-none">
-                    Experimental
-                  </span>
-                </>
-              )}
+              {t.id === 'pixel-agents' &&
+                Object.values(pixelAgentsStatus.offices).some(
+                  (s) => s === 'connected' || s === 'registered',
+                ) && (
+                  <span className="ml-1.5 w-2 h-2 rounded-full bg-[hsl(var(--git-added))] inline-block" />
+                )}
             </button>
           ))}
         </div>
@@ -1735,13 +1675,9 @@ export function SettingsModal({
 
           {tab === 'usage' && (
             <UsageSection
-              statusLineData={statusLineData}
-              taskNames={taskNames}
               latestRateLimits={latestRateLimits}
               thresholds={usageThresholds}
               onThresholdsChange={onUsageThresholdsChange}
-              showUsageWidget={showUsageWidget}
-              onShowUsageWidgetChange={onShowUsageWidgetChange}
               showRateLimits={showRateLimits}
               onShowRateLimitsChange={onShowRateLimitsChange}
               showUsageInline={showUsageInline}
