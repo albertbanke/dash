@@ -144,7 +144,7 @@ export function MainContent({
         }
 
         // Also check Linear linked issues for PRs
-        if (!cancelled && !pr && activeTask.linkedItems) {
+        if (!cancelled && !pr && activeTask?.linkedItems) {
           const linearItems = activeTask.linkedItems.filter((i) => i.provider === 'linear');
           for (const item of linearItems) {
             if (cancelled) break;
